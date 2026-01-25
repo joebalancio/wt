@@ -8,6 +8,7 @@ A CLI tool for managing git worktrees with configurable hooks.
 - **Configurable Hooks**: Run commands after worktree operations (npm install, cargo build, etc.)
 - **Project-Specific Configs**: Override settings per project using glob patterns
 - **Filtering**: Filter worktrees by branch name or path prefix
+- **Branch Stacking**: Integration with git-spice for stacked branch workflows
 
 ## Installation
 
@@ -46,6 +47,57 @@ wt --help
 wt worktree --help
 wt worktree add --help
 ```
+
+## Stacking Features (v2)
+
+WT v2 integrates with [git-spice](https://github.com/abhinav/git-spice) for branch stacking.
+
+### Installation
+
+1. Install git-spice:
+   ```bash
+   cargo install git-spice
+   # or
+   brew install git-spice
+   ```
+
+2. Initialize wt:
+   ```bash
+   wt init
+   ```
+
+### Basic Stacking Workflow
+
+```bash
+# Create root branch
+wt add feat/auth
+cd ~/worktrees/feat/auth
+
+# Stack on current (auto-suffix)
+wt stack
+# Creates: feat/auth-xY7k
+
+# Stack with named suffix
+wt stack api
+# Creates: feat/auth-api-k9P2
+
+# View stack hierarchy
+wt stack list
+```
+
+### Configuration
+
+Worktree location is configurable in `~/.config/wt/config.yaml`:
+
+```yaml
+worktree:
+  location: dedicated      # "dedicated" or "per-repo"
+  dedicated_path: ~/worktrees  # custom path for dedicated mode
+```
+
+### Health Check
+
+Run `wt doctor` to verify installation and dependencies.
 
 ## Documentation
 

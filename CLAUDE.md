@@ -63,15 +63,30 @@ internal/
 │   ├── root.go        # Global flags, command registration
 │   ├── worktree.go    # Worktree subcommands
 │   ├── session.go     # Session subcommands
-│   └── config.go      # Config subcommands
+│   ├── config.go      # Config subcommands
+│   ├── stack.go       # Stack command (branch stacking)
+│   ├── init.go        # Init command
+│   ├── doctor.go      # Doctor command
+│   └── setup.go       # Setup command (re-run hooks)
 ├── config/            # Configuration system
 │   └── config.go      # YAML loading, validation, discovery
 ├── git/               # Git worktree operations
 │   └── worktree.go    # Client pattern, porcelain parser
 ├── tmux/              # Tmux session operations
 │   └── session.go     # Client pattern, list/create/attach/kill
-pkg/executor/
-└── executor.go        # Subprocess execution with timeout/parallel support
+├── spice/             # Git-spice client wrapper
+│   └── client.go      # Branch stacking operations
+├── stack/             # Stack management
+│   ├── service.go     # Stack service logic
+│   └── tree.go        # Tree formatting for display
+└── worktree/          # Worktree service layer
+    └── service.go     # Worktree operations
+pkg/
+├── domain/            # Domain models
+│   └── worktree.go    # Worktree, StackBranch types
+└── executor/          # Subprocess execution
+    ├── executor.go    # General command execution
+    └── hook_runner.go # Hook execution for setup automation
 ```
 
 ### Key Architectural Patterns
@@ -154,5 +169,26 @@ Hook commands support `{worktree_path}` template variable. This is expanded befo
 
 - `github.com/spf13/cobra` - CLI framework
 - `gopkg.in/yaml.v3` - YAML configuration parsing
+- `github.com/aidarkhanov/nanoid` - Unique ID generation for branch suffixes
+- `github.com/abhinav/git-spice` - Branch stacking (external dependency, invoked via CLI)
 
 No other external dependencies. Git and tmux are invoked via CLI, not libraries.
+
+### Stack Management (v2)
+
+WT v2 adds stack management via git-spice integration:
+
+- `internal/stack/service.go` - Stack operations using nanoid for unique suffixes
+- `internal/stack/tree.go` - Tree formatting for stack hierarchy display
+- `internal/spice/client.go` - Git-spice client wrapper
+- `pkg/executor/hook_runner.go` - Hook execution for setup automation
+
+Stack naming convention:
+- Auto-suffix: `feat/auth` -> `feat/auth-xY7k` (4-char nanoid)
+- Named suffix: `feat/auth` -> `feat/auth-api-k9P2`
+
+The stack service integrates with:
+- Git client for worktree operations
+- Git-spice for branch stack management
+- Config service for worktree path resolution
+- Hook runner for post-create automation
