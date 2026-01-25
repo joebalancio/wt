@@ -14,11 +14,12 @@ var _ git.GitClient = (*mockGitClient)(nil)
 
 // mockGitClient is a simple mock for testing
 type mockGitClient struct {
-	listWorktreesFunc  func(ctx context.Context) ([]*domain.Worktree, error)
-	addWorktreeFunc    func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error)
-	removeWorktreeFunc func(ctx context.Context, path string, force bool) error
-	getRepoInfoFunc    func(ctx context.Context) (*domain.GitRepo, error)
-	branchExistsFunc   func(ctx context.Context, branch string) (bool, error)
+	listWorktreesFunc    func(ctx context.Context) ([]*domain.Worktree, error)
+	addWorktreeFunc      func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error)
+	removeWorktreeFunc   func(ctx context.Context, path string, force bool) error
+	getRepoInfoFunc      func(ctx context.Context) (*domain.GitRepo, error)
+	branchExistsFunc     func(ctx context.Context, branch string) (bool, error)
+	getCurrentBranchFunc func(ctx context.Context) (string, error)
 }
 
 func (m *mockGitClient) ListWorktrees(ctx context.Context) ([]*domain.Worktree, error) {
@@ -54,6 +55,13 @@ func (m *mockGitClient) BranchExists(ctx context.Context, branch string) (bool, 
 		return m.branchExistsFunc(ctx, branch)
 	}
 	return true, nil
+}
+
+func (m *mockGitClient) GetCurrentBranch(ctx context.Context) (string, error) {
+	if m.getCurrentBranchFunc != nil {
+		return m.getCurrentBranchFunc(ctx)
+	}
+	return "main", nil
 }
 
 func TestService_List(t *testing.T) {

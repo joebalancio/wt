@@ -116,29 +116,46 @@ func NewStackListCmd() *cobra.Command {
 			ctx := context.Background()
 			out := cmd.OutOrStdout()
 
+			// Create clients
+			gitClient, err := git.NewClient()
+			if err != nil {
+				Fatal("Failed to create git client: %v", err)
+			}
+
 			spiceClient, err := spice.NewClient()
 			if err != nil {
 				Fatal("Failed to create git-spice client: %v", err)
 			}
 
-			// Get stack from git-spice
-			branches, err := spiceClient.GetStack(ctx)
+			// Load config
+			cfg, err := loadConfigForCommand()
+			if err != nil {
+				Fatal("Failed to load config: %v", err)
+			}
+
+			// Create stack service
+			stackService, err := stack.NewService(gitClient, spiceClient, cfg)
+			if err != nil {
+				Fatal("Failed to create stack service: %v", err)
+			}
+
+			// Get stack with worktree paths
+			branches, err := stackService.GetStack(ctx)
 			if err != nil {
 				Fatal("Failed to get stack: %v", err)
 			}
 
 			// Get current branch for highlighting
-			gitClient, err := git.NewClient()
-			if err == nil {
-				currentBranch, _ := gitClient.GetCurrentBranch(ctx)
-				// TODO: Format tree display with current marker
-				_ = currentBranch
+			currentBranch, _ := gitClient.GetCurrentBranch(ctx)
+			for _, branch := range branches {
+				if branch.Name == currentBranch {
+					branch.IsHead = true
+				}
 			}
 
-			// Simple display for now
-			for _, branch := range branches {
-				fmt.Fprintf(out, "%s\n", branch.Name)
-			}
+			// Format and display tree
+			treeOutput := stack.FormatStackTree(branches)
+			fmt.Fprint(out, treeOutput)
 		},
 	}
 
