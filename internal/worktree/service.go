@@ -14,10 +14,13 @@ type Service struct {
 }
 
 // NewService creates a new worktree service
-func NewService(gitClient git.GitClient) *Service {
+func NewService(gitClient git.GitClient) (*Service, error) {
+	if gitClient == nil {
+		return nil, fmt.Errorf("gitClient cannot be nil")
+	}
 	return &Service{
 		git: gitClient,
-	}
+	}, nil
 }
 
 // List returns worktrees, optionally filtered

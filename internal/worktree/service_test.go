@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/user/wt/internal/git"
@@ -66,7 +67,10 @@ func TestService_List(t *testing.T) {
 			},
 		}
 
-		svc := NewService(mock)
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
 		worktrees, err := svc.List(context.Background(), nil)
 
 		if err != nil {
@@ -74,6 +78,38 @@ func TestService_List(t *testing.T) {
 		}
 		if len(worktrees) != 2 {
 			t.Errorf("got %d worktrees, want 2", len(worktrees))
+		}
+	})
+
+	t.Run("returns error when git client fails", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(ctx context.Context) ([]*domain.Worktree, error) {
+				return nil, fmt.Errorf("git command failed")
+			},
+		}
+
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+		_, err = svc.List(context.Background(), nil)
+
+		if err == nil {
+			t.Fatal("List() expected error, got nil")
+		}
+		if err == nil || err.Error() == "" {
+			t.Errorf("expected error message, got empty")
+		}
+	})
+
+	t.Run("returns error when NewService called with nil", func(t *testing.T) {
+		_, err := NewService(nil)
+
+		if err == nil {
+			t.Fatal("NewService(nil) expected error, got nil")
+		}
+		if err.Error() != "gitClient cannot be nil" {
+			t.Errorf("expected 'gitClient cannot be nil', got %q", err.Error())
 		}
 	})
 
@@ -87,7 +123,10 @@ func TestService_List(t *testing.T) {
 			},
 		}
 
-		svc := NewService(mock)
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
 		filter := &domain.WorktreeFilter{Branches: []string{"main"}}
 		worktrees, err := svc.List(context.Background(), filter)
 
@@ -114,7 +153,10 @@ func TestService_Add(t *testing.T) {
 			},
 		}
 
-		svc := NewService(mock)
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
 		spec := domain.WorktreeCreateSpec{
 			Branch: "new-feature",
 			Base:   "main",
@@ -128,6 +170,49 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("got branch %s, want new-feature", worktree.Branch)
 		}
 	})
+
+	t.Run("returns error when spec validation fails", func(t *testing.T) {
+		mock := &mockGitClient{}
+
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		// Invalid spec - empty branch
+		spec := domain.WorktreeCreateSpec{
+			Branch: "",
+			Base:   "main",
+		}
+
+		_, err = svc.Add(context.Background(), spec)
+		if err == nil {
+			t.Fatal("Add() expected error for invalid spec, got nil")
+		}
+	})
+
+	t.Run("returns error when git client fails", func(t *testing.T) {
+		mock := &mockGitClient{
+			addWorktreeFunc: func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+				return nil, fmt.Errorf("git worktree add failed")
+			},
+		}
+
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		spec := domain.WorktreeCreateSpec{
+			Branch: "new-feature",
+			Base:   "main",
+		}
+
+		_, err = svc.Add(context.Background(), spec)
+		if err == nil {
+			t.Fatal("Add() expected error when git client fails, got nil")
+		}
+	})
 }
 
 func TestService_Remove(t *testing.T) {
@@ -138,10 +223,49 @@ func TestService_Remove(t *testing.T) {
 			},
 		}
 
-		svc := NewService(mock)
-		err := svc.Remove(context.Background(), "/test/worktree", false)
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.Remove(context.Background(), "/test/worktree", false)
 		if err != nil {
 			t.Fatalf("Remove() error = %v", err)
+		}
+	})
+
+	t.Run("returns error when path is empty", func(t *testing.T) {
+		mock := &mockGitClient{}
+
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.Remove(context.Background(), "", false)
+		if err == nil {
+			t.Fatal("Remove() expected error for empty path, got nil")
+		}
+		if err.Error() != "path is required" {
+			t.Errorf("expected 'path is required', got %q", err.Error())
+		}
+	})
+
+	t.Run("returns error when git client fails", func(t *testing.T) {
+		mock := &mockGitClient{
+			removeWorktreeFunc: func(ctx context.Context, path string, force bool) error {
+				return fmt.Errorf("git worktree remove failed")
+			},
+		}
+
+		svc, err := NewService(mock)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.Remove(context.Background(), "/test/worktree", false)
+		if err == nil {
+			t.Fatal("Remove() expected error when git client fails, got nil")
 		}
 	})
 }
