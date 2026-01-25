@@ -1,0 +1,46 @@
+# Example wt configuration file
+# Copy to ~/.config/wt/config.yaml or .wt.yaml in your project
+
+global:
+  # Base directory for worktrees (supports ~ expansion)
+  worktree_root: ~/dev/worktrees
+
+  # Prefix for tmux session names
+  tmux_session_prefix: "wt-"
+
+# Hooks run automatically after worktree operations
+hooks:
+  on_worktree_create:
+    # Example: Install Node.js dependencies
+    - run: "npm install"
+      cwd: "{worktree_path}"
+      background: false
+
+    # Example: Run build in background
+    - run: "npm run build"
+      cwd: "{worktree_path}"
+      background: true
+
+  on_worktree_remove:
+    # Example: Clean up on remove
+    - run: "rm -rf node_modules"
+      cwd: "{worktree_path}"
+
+# Project-specific overrides (matched by glob pattern)
+project_overrides:
+  - match: "**/*rust*"
+    hooks:
+      on_worktree_create:
+        - run: "cargo fetch"
+          cwd: "{worktree_path}"
+
+# Tmux settings
+tmux:
+  # Layout: main-vertical, main-horizontal, even-horizontal, tiled, etc.
+  layout: "main-vertical"
+
+  # Name for the initial window
+  window_name: "work"
+
+  # Automatically attach to session after creation
+  attach_on_create: true
