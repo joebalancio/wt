@@ -1,27 +1,79 @@
-# wt - Git Worktree + Tmux CLI Tool
+# wt - Git Worktree CLI Tool
 
-A high-level CLI tool for managing git worktrees with tmux integration and configurable hooks.
+A CLI tool for managing git worktrees with configurable hooks.
 
 ## Features
 
-- **Worktree Management**: Create, list, and remove git worktrees
-- **Tmux Integration**: Automatic session creation and attachment
+- **Worktree Management**: Add, list, and remove git worktrees
 - **Configurable Hooks**: Run commands after worktree operations (npm install, cargo build, etc.)
 - **Project-Specific Configs**: Override settings per project using glob patterns
+- **Filtering**: Filter worktrees by branch name or path prefix
 
 ## Installation
 
+### From source
+
 ```bash
-go install github.com/user/wt/cmd/wt@latest
+git clone https://github.com/user/wt.git
+cd wt
+make build
+sudo mv bin/wt /usr/local/bin/
 ```
+
+### Using go install
+
+```bash
+go install github.com/user/wt@latest
+```
+
+## Quick Start
+
+```bash
+# List worktrees in current repository
+wt worktree list
+
+# Add a new worktree for a feature branch
+wt worktree add feature/login
+
+# Add a worktree from a specific base branch
+wt worktree add feature/experimental --base main
+
+# Remove a worktree
+wt worktree remove /path/to/worktree
+
+# Show help
+wt --help
+wt worktree --help
+wt worktree add --help
+```
+
+## Documentation
+
+See [docs/usage.md](docs/usage.md) for detailed usage examples and command reference.
+
+## Configuration
+
+Create a config file at `~/.config/wt/config.yaml` or `.wt.yaml` in your project:
+
+```yaml
+global:
+  worktree_root: ~/dev/worktrees
+  tmux_session_prefix: "wt-"
+
+hooks:
+  on_worktree_create:
+    - run: "npm install"
+      cwd: "{worktree_path}"
+      background: false
+```
+
+See [configs/example.yaml](configs/example.yaml) for a complete example.
 
 ## Development
 
-This project uses AI-friendly development tools with excellent community support:
-
 ### Prerequisites
 
-- Go 1.20 or later
+- Go 1.22 or later
 - Git
 - Make (optional, but recommended)
 
@@ -37,19 +89,9 @@ go install github.com/cosmtrek/air@latest
 go install mvdan.cc/gofumpt@latest
 ```
 
-### Pre-commit Hooks (Optional)
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
 ### Development Commands
 
 ```bash
-# Show all available commands
-make help
-
 # Format code
 make fmt
 
@@ -72,48 +114,6 @@ make dev
 make check
 ```
 
-## Configuration
-
-Create a config file at `~/.config/wt/config.yaml` or `.wt.yaml` in your project:
-
-```yaml
-global:
-  worktree_root: ~/dev/worktrees
-  tmux_session_prefix: "wt-"
-
-hooks:
-  on_worktree_create:
-    - run: "npm install"
-      cwd: "{worktree_path}"
-      background: false
-
-tmux:
-  layout: "main-vertical"
-  window_name: "work"
-  attach_on_create: true
-```
-
-See [configs/example.yaml](configs/example.yaml) for a complete example.
-
-## Usage
-
-```bash
-# Create a new worktree
-wt worktree create feature-branch
-
-# List all worktrees
-wt worktree list
-
-# Remove a worktree
-wt worktree remove /path/to/worktree
-
-# Attach to a session
-wt session attach wt-feature-branch
-
-# Initialize config
-wt config init
-```
-
 ## Project Structure
 
 ```
@@ -123,19 +123,13 @@ wt/
 │   ├── cli/          # CLI commands (cobra)
 │   ├── config/       # Configuration management
 │   ├── git/          # Git operations
-│   └── tmux/         # Tmux operations
-├── pkg/executor/     # Subprocess execution
+│   └── worktree/     # Worktree service logic
+├── pkg/              # Public packages
+│   ├── domain/       # Domain models
+│   └── executor/     # Subprocess execution
 ├── configs/          # Example configurations
-└── tests/            # Integration tests
+└── docs/             # Documentation
 ```
-
-## Development Philosophy
-
-This project is designed to be AI-friendly:
-- **Well-known tools**: golangci-lint, cobra, testify - all with excellent documentation
-- **Clear structure**: Standard Go project layout
-- **Comprehensive tooling**: Linting, testing, hot-reload, CI/CD
-- **Stable APIs**: Using mature libraries with active communities
 
 ## License
 
