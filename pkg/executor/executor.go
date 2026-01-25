@@ -20,6 +20,7 @@ type HookResult struct {
 // Executor handles subprocess execution
 type Executor struct {
 	timeout time.Duration
+	verbose int
 }
 
 // New creates a new Executor
@@ -32,6 +33,16 @@ func New() *Executor {
 // SetTimeout sets the execution timeout
 func (e *Executor) SetTimeout(d time.Duration) {
 	e.timeout = d
+}
+
+// SetVerboseLevel sets the verbosity level (0 = quiet, >0 = verbose)
+func (e *Executor) SetVerboseLevel(level int) {
+	e.verbose = level
+}
+
+// GetVerboseLevel returns the current verbosity level
+func (e *Executor) GetVerboseLevel() int {
+	return e.verbose
 }
 
 // Run executes a command with context and timeout
@@ -48,6 +59,10 @@ func (e *Executor) Run(ctx context.Context, workdir string, command string) *Hoo
 		}
 	}
 
+	// Add timeout context before creating the command
+	ctx, cancel := context.WithTimeout(ctx, e.timeout)
+	defer cancel()
+
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	if workdir != "" {
 		cmd.Dir = workdir
@@ -56,10 +71,6 @@ func (e *Executor) Run(ctx context.Context, workdir string, command string) *Hoo
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-
-	// Add timeout context
-	ctx, cancel := context.WithTimeout(ctx, e.timeout)
-	defer cancel()
 
 	err := cmd.Run()
 	duration := time.Since(startTime)
@@ -76,8 +87,13 @@ func (e *Executor) Run(ctx context.Context, workdir string, command string) *Hoo
 		Error:   err,
 	}
 
-	if Verbose := 0; Verbose > 0 && err != nil {
-		result.Output += fmt.Sprintf("\n[exited with status %v after %v]", err, duration)
+	// Add verbose output with timing information when verbosity is enabled
+	if e.verbose > 0 {
+		if err != nil {
+			result.Output += fmt.Sprintf("\n[exited with error: %v after %v]", err, duration)
+		} else {
+			result.Output += fmt.Sprintf("\n[completed successfully after %v]", duration)
+		}
 	}
 
 	return result
