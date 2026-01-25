@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 )
 
 // Worktree represents a git worktree
@@ -15,6 +16,9 @@ type Worktree struct {
 
 // String returns a formatted representation of the worktree
 func (w *Worktree) String() string {
+	if w == nil {
+		return "<nil>"
+	}
 	if w.Bare {
 		return fmt.Sprintf("%s (bare)", w.Path)
 	}
@@ -59,10 +63,7 @@ func (f *WorktreeFilter) Matches(w *Worktree) bool {
 	if !f.IncludeBare && w.Bare {
 		return false
 	}
-	if f.PathPrefix != "" && w.Path != f.PathPrefix && len(w.Path) < len(f.PathPrefix) {
-		return false
-	}
-	if f.PathPrefix != "" && w.Path[:len(f.PathPrefix)] != f.PathPrefix {
+	if f.PathPrefix != "" && !strings.HasPrefix(w.Path, f.PathPrefix) {
 		return false
 	}
 	if len(f.Branches) > 0 {
