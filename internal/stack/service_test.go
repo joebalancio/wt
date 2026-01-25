@@ -4,11 +4,17 @@ import (
 	"context"
 	"testing"
 
+	"github.com/user/wt/internal/config"
 	"github.com/user/wt/internal/spice"
+	"github.com/user/wt/pkg/domain"
 )
 
 func TestNewService(t *testing.T) {
-	service, err := NewService(nil)
+	mockGit := &MockGitClient{}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+
+	service, err := NewService(mockGit, mockSpice, cfg)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -17,8 +23,45 @@ func TestNewService(t *testing.T) {
 	}
 }
 
+func TestNewService_NilGitClient(t *testing.T) {
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+
+	_, err := NewService(nil, mockSpice, cfg)
+	if err == nil {
+		t.Error("NewService() with nil gitClient should return error")
+	}
+}
+
+func TestNewService_NilSpiceClient(t *testing.T) {
+	mockGit := &MockGitClient{}
+	cfg := config.DefaultConfig()
+
+	_, err := NewService(mockGit, nil, cfg)
+	if err == nil {
+		t.Error("NewService() with nil spiceClient should return error")
+	}
+}
+
+func TestNewService_NilConfigUsesDefault(t *testing.T) {
+	mockGit := &MockGitClient{}
+	mockSpice := &MockSpiceClient{}
+
+	service, err := NewService(mockGit, mockSpice, nil)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	if service.cfg == nil {
+		t.Error("NewService() should use default config when nil is passed")
+	}
+}
+
 func TestService_GenerateBranchSuffix(t *testing.T) {
-	service, _ := NewService(nil)
+	mockGit := &MockGitClient{}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
 
 	suffix1 := service.GenerateBranchSuffix()
 	suffix2 := service.GenerateBranchSuffix()
@@ -32,7 +75,11 @@ func TestService_GenerateBranchSuffix(t *testing.T) {
 }
 
 func TestService_BuildStackBranchName(t *testing.T) {
-	service, _ := NewService(nil)
+	mockGit := &MockGitClient{}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
 
 	tests := []struct {
 		name       string
@@ -70,19 +117,23 @@ func TestService_BuildStackBranchName(t *testing.T) {
 }
 
 func TestService_CreateStackBranch(t *testing.T) {
-	// Create a mock spice client
-	mockClient := &MockSpiceClient{
+	mockGit := &MockGitClient{
+		currentBranch: "feat/auth",
+	}
+	mockSpice := &MockSpiceClient{
 		createFunc: func(_ context.Context, spec spice.BranchCreateSpec) (*spice.Branch, error) {
-			return &spice.Branch{Name: spec.Name}, nil
+			return &spice.Branch{Name: spec.Name, IsRoot: false, IsHead: false}, nil
 		},
 	}
+	cfg := config.DefaultConfig()
 
-	service, err := NewService(mockClient)
+	service, err := NewService(mockGit, mockSpice, cfg)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	branch, err := service.CreateStackBranch(context.Background(), "feat/auth", "")
+	spec := StackBranchSpec{Name: ""}
+	branch, err := service.CreateStackBranch(context.Background(), spec)
 	if err != nil {
 		t.Fatalf("CreateStackBranch() error = %v", err)
 	}
@@ -94,22 +145,44 @@ func TestService_CreateStackBranch(t *testing.T) {
 	}
 }
 
+func TestService_CreateStackBranch_NamedSuffix(t *testing.T) {
+	mockGit := &MockGitClient{
+		currentBranch: "feat/auth",
+	}
+	mockSpice := &MockSpiceClient{
+		createFunc: func(_ context.Context, spec spice.BranchCreateSpec) (*spice.Branch, error) {
+			return &spice.Branch{Name: spec.Name}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	spec := StackBranchSpec{Name: "api"}
+	branch, err := service.CreateStackBranch(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("CreateStackBranch() error = %v", err)
+	}
+	if branch.Name == "" {
+		t.Error("branch name should not be empty")
+	}
+}
+
 func TestService_GetStack(t *testing.T) {
+	mockGit := &MockGitClient{}
 	mockBranches := []*spice.Branch{
 		{Name: "main", IsRoot: true},
 		{Name: "feat/auth", IsRoot: false},
 	}
 
-	mockClient := &MockSpiceClient{
+	mockSpice := &MockSpiceClient{
 		stackFunc: func(_ context.Context) ([]*spice.Branch, error) {
 			return mockBranches, nil
 		},
 	}
+	cfg := config.DefaultConfig()
 
-	service, err := NewService(mockClient)
-	if err != nil {
-		t.Fatalf("NewService() error = %v", err)
-	}
+	service, _ := NewService(mockGit, mockSpice, cfg)
 
 	stack, err := service.GetStack(context.Background())
 	if err != nil {
@@ -120,8 +193,54 @@ func TestService_GetStack(t *testing.T) {
 	}
 }
 
+func TestService_GetWorktreePathForBranch(t *testing.T) {
+	mockGit := &MockGitClient{
+		repoRoot: "/home/user/project",
+	}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	path := service.GetWorktreePathForBranch("feat/auth")
+	expected := cfg.Worktree.GetDedicatedPath() + "/feat/auth"
+	if path != expected {
+		t.Errorf("path = %v, want %v", path, expected)
+	}
+}
+
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// MockGitClient is a mock implementation of git.GitClient for testing
+type MockGitClient struct {
+	currentBranch string
+	repoRoot      string
+}
+
+func (m *MockGitClient) GetCurrentBranch(_ context.Context) (string, error) {
+	return m.currentBranch, nil
+}
+
+func (m *MockGitClient) GetRepoInfo(_ context.Context) (*domain.GitRepo, error) {
+	return &domain.GitRepo{RootPath: m.repoRoot}, nil
+}
+
+func (m *MockGitClient) ListWorktrees(_ context.Context) ([]*domain.Worktree, error) {
+	return []*domain.Worktree{}, nil
+}
+
+func (m *MockGitClient) AddWorktree(_ context.Context, _ domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+	return &domain.Worktree{}, nil
+}
+
+func (m *MockGitClient) RemoveWorktree(_ context.Context, _ string, _ bool) error {
+	return nil
+}
+
+func (m *MockGitClient) BranchExists(_ context.Context, _ string) (bool, error) {
+	return false, nil
 }
 
 // MockSpiceClient is a mock implementation of SpiceClient for testing

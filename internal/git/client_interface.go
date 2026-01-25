@@ -18,4 +18,5 @@ type GitClient interface {
 	RemoveWorktree(ctx context.Context, path string, force bool) error
 	GetRepoInfo(ctx context.Context) (*domain.GitRepo, error)
 	BranchExists(ctx context.Context, branch string) (bool, error)
+	GetCurrentBranch(ctx context.Context) (string, error)
 }
