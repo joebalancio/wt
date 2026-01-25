@@ -82,10 +82,16 @@ func (s *Service) CreateStackBranch(ctx context.Context, spec StackBranchSpec) (
 	// Build the new branch name
 	branchName := s.BuildStackBranchName(currentBranch, spec.Name)
 
+	// Determine base branch - default to current if not specified
+	base := spec.Base
+	if base == "" {
+		base = currentBranch
+	}
+
 	// Create branch via git-spice
 	spiceSpec := spice.BranchCreateSpec{
 		Name: branchName,
-		Base: spec.Base,
+		Base: base,
 	}
 
 	branch, err := s.spice.CreateBranch(ctx, spiceSpec)
@@ -94,7 +100,7 @@ func (s *Service) CreateStackBranch(ctx context.Context, spec StackBranchSpec) (
 	}
 
 	// Generate worktree path
-	worktreePath := s.getWorktreePath(branch.Name)
+	worktreePath := s.getWorktreePath(ctx, branch.Name)
 
 	return &domain.StackBranch{
 		Name:   branch.Name,
@@ -104,7 +110,7 @@ func (s *Service) CreateStackBranch(ctx context.Context, spec StackBranchSpec) (
 	}, nil
 }
 
-// GetStack returns the current stack of branches
+// GetStack returns the current stack of branches with worktree paths
 func (s *Service) GetStack(ctx context.Context) ([]*domain.StackBranch, error) {
 	spiceBranches, err := s.spice.GetStack(ctx)
 	if err != nil {
@@ -113,43 +119,54 @@ func (s *Service) GetStack(ctx context.Context) ([]*domain.StackBranch, error) {
 
 	stackBranches := make([]*domain.StackBranch, 0, len(spiceBranches))
 	for _, sb := range spiceBranches {
-		stackBranches = append(stackBranches, convertToDomainStackBranch(sb))
+		stackBranches = append(stackBranches, s.convertToDomainStackBranch(ctx, sb))
 	}
 
 	return stackBranches, nil
 }
 
 // GetWorktreePathForBranch returns the worktree path for a given branch name
-func (s *Service) GetWorktreePathForBranch(branch string) string {
-	return s.getWorktreePath(branch)
+func (s *Service) GetWorktreePathForBranch(ctx context.Context, branch string) (string, error) {
+	path := s.getWorktreePath(ctx, branch)
+	return path, nil
 }
 
 // getWorktreePath returns the worktree path for a branch
-func (s *Service) getWorktreePath(branch string) string {
+func (s *Service) getWorktreePath(ctx context.Context, branch string) string {
 	if s.cfg.Worktree.IsDedicated() {
 		return filepath.Join(s.cfg.Worktree.GetDedicatedPath(), branch)
 	}
-	// per-repo mode
-	repoInfo, _ := s.git.GetRepoInfo(context.Background())
+	// per-repo mode - get repo info safely
+	repoInfo, err := s.git.GetRepoInfo(ctx)
+	if err != nil || repoInfo == nil {
+		// Fallback: use current directory if we can't get repo info
+		return filepath.Join(".", ".worktrees", branch)
+	}
 	return filepath.Join(repoInfo.RootPath, ".worktrees", branch)
 }
 
 // convertToDomainStackBranch converts a spice.Branch to domain.StackBranch
-func convertToDomainStackBranch(sb *spice.Branch) *domain.StackBranch {
+func (s *Service) convertToDomainStackBranch(ctx context.Context, sb *spice.Branch) *domain.StackBranch {
 	if sb == nil {
 		return nil
 	}
 
 	children := make([]*domain.StackBranch, 0, len(sb.Children))
 	for _, child := range sb.Children {
-		children = append(children, convertToDomainStackBranch(child))
+		children = append(children, s.convertToDomainStackBranch(ctx, child))
+	}
+
+	// Get worktree path for this branch
+	path := ""
+	if sb.Name != "" {
+		path = s.getWorktreePath(ctx, sb.Name)
 	}
 
 	return &domain.StackBranch{
 		Name:     sb.Name,
 		IsRoot:   sb.IsRoot,
 		IsHead:   sb.IsHead,
-		Path:     "", // Path is determined by worktree lookup, not from spice
+		Path:     path,
 		Children: children,
 	}
 }

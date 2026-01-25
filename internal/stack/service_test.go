@@ -2,6 +2,7 @@ package stack
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/user/wt/internal/config"
@@ -119,6 +120,7 @@ func TestService_BuildStackBranchName(t *testing.T) {
 func TestService_CreateStackBranch(t *testing.T) {
 	mockGit := &MockGitClient{
 		currentBranch: "feat/auth",
+		repoRoot:      "/home/user/project",
 	}
 	mockSpice := &MockSpiceClient{
 		createFunc: func(_ context.Context, spec spice.BranchCreateSpec) (*spice.Branch, error) {
@@ -143,11 +145,15 @@ func TestService_CreateStackBranch(t *testing.T) {
 	if branch.Name == "" {
 		t.Error("branch name should not be empty")
 	}
+	if branch.Path == "" {
+		t.Error("branch path should not be empty")
+	}
 }
 
 func TestService_CreateStackBranch_NamedSuffix(t *testing.T) {
 	mockGit := &MockGitClient{
 		currentBranch: "feat/auth",
+		repoRoot:      "/home/user/project",
 	}
 	mockSpice := &MockSpiceClient{
 		createFunc: func(_ context.Context, spec spice.BranchCreateSpec) (*spice.Branch, error) {
@@ -168,8 +174,64 @@ func TestService_CreateStackBranch_NamedSuffix(t *testing.T) {
 	}
 }
 
+func TestService_CreateStackBranch_WithBase(t *testing.T) {
+	mockGit := &MockGitClient{
+		currentBranch: "feat/auth",
+		repoRoot:      "/home/user/project",
+	}
+	var capturedBase string
+	mockSpice := &MockSpiceClient{
+		createFunc: func(_ context.Context, spec spice.BranchCreateSpec) (*spice.Branch, error) {
+			capturedBase = spec.Base
+			return &spice.Branch{Name: spec.Name}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	// Test with explicit base
+	spec := StackBranchSpec{Name: "fix", Base: "main"}
+	_, err := service.CreateStackBranch(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("CreateStackBranch() error = %v", err)
+	}
+	if capturedBase != "main" {
+		t.Errorf("Base = %v, want main", capturedBase)
+	}
+}
+
+func TestService_CreateStackBranch_BaseDefaultsToCurrent(t *testing.T) {
+	mockGit := &MockGitClient{
+		currentBranch: "feat/auth",
+		repoRoot:      "/home/user/project",
+	}
+	var capturedBase string
+	mockSpice := &MockSpiceClient{
+		createFunc: func(_ context.Context, spec spice.BranchCreateSpec) (*spice.Branch, error) {
+			capturedBase = spec.Base
+			return &spice.Branch{Name: spec.Name}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	// Test without base - should default to current branch
+	spec := StackBranchSpec{Name: "fix"}
+	_, err := service.CreateStackBranch(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("CreateStackBranch() error = %v", err)
+	}
+	if capturedBase != "feat/auth" {
+		t.Errorf("Base = %v, want feat/auth", capturedBase)
+	}
+}
+
 func TestService_GetStack(t *testing.T) {
-	mockGit := &MockGitClient{}
+	mockGit := &MockGitClient{
+		repoRoot: "/home/user/project",
+	}
 	mockBranches := []*spice.Branch{
 		{Name: "main", IsRoot: true},
 		{Name: "feat/auth", IsRoot: false},
@@ -191,6 +253,12 @@ func TestService_GetStack(t *testing.T) {
 	if len(stack) != 2 {
 		t.Errorf("got %d branches, want 2", len(stack))
 	}
+	// Verify paths are populated
+	for _, branch := range stack {
+		if branch.Path == "" {
+			t.Errorf("branch %s should have a path", branch.Name)
+		}
+	}
 }
 
 func TestService_GetWorktreePathForBranch(t *testing.T) {
@@ -202,10 +270,48 @@ func TestService_GetWorktreePathForBranch(t *testing.T) {
 
 	service, _ := NewService(mockGit, mockSpice, cfg)
 
-	path := service.GetWorktreePathForBranch("feat/auth")
+	path, err := service.GetWorktreePathForBranch(context.Background(), "feat/auth")
+	if err != nil {
+		t.Fatalf("GetWorktreePathForBranch() error = %v", err)
+	}
 	expected := cfg.Worktree.GetDedicatedPath() + "/feat/auth"
 	if path != expected {
 		t.Errorf("path = %v, want %v", path, expected)
+	}
+}
+
+func TestService_getWorktreePath_PerRepoMode(t *testing.T) {
+	mockGit := &MockGitClient{
+		repoRoot: "/home/user/project",
+	}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+	cfg.Worktree.Location = "per-repo"
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	path := service.getWorktreePath(context.Background(), "feat/auth")
+	expected := "/home/user/project/.worktrees/feat/auth"
+	if path != expected {
+		t.Errorf("path = %v, want %v", path, expected)
+	}
+}
+
+func TestService_getWorktreePath_PerRepoMode_ErrorFallback(t *testing.T) {
+	mockGit := &MockGitClient{
+		repoRoot:      "",
+		repoInfoError: true, // simulate error
+	}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+	cfg.Worktree.Location = "per-repo"
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	path := service.getWorktreePath(context.Background(), "feat/auth")
+	// Should fallback to relative path
+	if path == "" {
+		t.Error("path should not be empty even with error")
 	}
 }
 
@@ -217,6 +323,7 @@ func hasPrefix(s, prefix string) bool {
 type MockGitClient struct {
 	currentBranch string
 	repoRoot      string
+	repoInfoError bool
 }
 
 func (m *MockGitClient) GetCurrentBranch(_ context.Context) (string, error) {
@@ -224,6 +331,9 @@ func (m *MockGitClient) GetCurrentBranch(_ context.Context) (string, error) {
 }
 
 func (m *MockGitClient) GetRepoInfo(_ context.Context) (*domain.GitRepo, error) {
+	if m.repoInfoError {
+		return nil, fmt.Errorf("mock repo info error")
+	}
 	return &domain.GitRepo{RootPath: m.repoRoot}, nil
 }
 
