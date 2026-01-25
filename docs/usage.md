@@ -58,13 +58,12 @@ wt worktree add <branch> [flags]
 | `--base <branch>` | Base branch for new branch (default: current HEAD) |
 | `--path <path>` | Custom path for the worktree |
 | `--force` | Force creation even if path exists |
-| `--track <branch>` | Remote branch to track |
 | `--no-checkout` | Don't checkout the branch |
 
 **Examples:**
 
 ```bash
-# Add a new worktree for an existing branch
+# Create a new branch from current HEAD and add worktree
 wt worktree add feature/login
 
 # Create a new branch from main and add worktree
@@ -73,18 +72,16 @@ wt worktree add feature/auth --base main
 # Create a worktree at a custom path
 wt worktree add hotfix-123 --path ~/projects/hotfix
 
-# Track a specific remote branch
-wt worktree add feature/api --track origin/feature/api
-
 # Create worktree without checking out files
 wt worktree add experiment --no-checkout
 ```
 
 **How it works:**
 
-1. If the branch already exists, it checks out that branch in a new worktree
-2. If the branch doesn't exist, it creates a new branch from the base (default: current HEAD)
+1. The command ALWAYS creates a new branch with the specified name
+2. The new branch is created from the base branch (default: current HEAD)
 3. The worktree is created at `<worktree_root>/<branch>` by default, or at a custom path if specified
+4. If a branch with the same name already exists, the command will fail
 
 ---
 
@@ -219,7 +216,7 @@ The following configuration sections are documented but NOT implemented in the c
 ### Creating a Feature Branch
 
 ```bash
-# Start a new feature from main
+# Create a new feature branch from main
 wt worktree add feature/new-auth --base main
 
 # The worktree is created at ~/dev/worktrees/feature/new-auth

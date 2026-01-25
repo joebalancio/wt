@@ -25,8 +25,9 @@ func NewAddCmd() *cobra.Command {
 		Short: "Add a new worktree",
 		Long: `Add a new worktree for the specified branch.
 
-If the branch already exists, it will be checked out in the new worktree.
-If the branch doesn't exist, it will be created from the specified base branch.`,
+The command ALWAYS creates a new branch with the specified name.
+The new branch is created from the base branch (default: current HEAD).
+If a branch with the same name already exists, the command will fail.`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			branch := args[0]
