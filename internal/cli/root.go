@@ -30,6 +30,25 @@ func init() {
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default is $HOME/.config/wt/config.yaml or .wt.yaml in project)")
 	rootCmd.PersistentFlags().CountP("verbose", "v", "verbose output (can be used multiple times)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "show what would be done without executing")
+
+	// Make `wt` (no args) equivalent to `wt worktree list`
+	rootCmd.Run = func(cmd *cobra.Command, args []string) {
+		// Find worktree command
+		for _, subcmd := range rootCmd.Commands() {
+			if subcmd.Name() == "worktree" {
+				// Find list command under worktree
+				for _, worktreeSubcmd := range subcmd.Commands() {
+					if worktreeSubcmd.Name() == "list" {
+						worktreeSubcmd.Run(cmd, args)
+						return
+					}
+				}
+				Fatal("list command not found")
+				return
+			}
+		}
+		Fatal("worktree command not found")
+	}
 }
 
 var dryRun bool
