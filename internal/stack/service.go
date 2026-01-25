@@ -110,6 +110,19 @@ func (s *Service) CreateStackBranch(ctx context.Context, spec StackBranchSpec) (
 	}, nil
 }
 
+// CreateWorktree creates a worktree for a stack branch
+func (s *Service) CreateWorktree(ctx context.Context, branch string) (*domain.Worktree, error) {
+	worktreePath := s.getWorktreePath(ctx, branch)
+
+	spec := domain.WorktreeCreateSpec{
+		Branch:   branch,
+		Path:     worktreePath,
+		Checkout: true,
+	}
+
+	return s.git.AddWorktree(ctx, spec)
+}
+
 // GetStack returns the current stack of branches with worktree paths
 func (s *Service) GetStack(ctx context.Context) ([]*domain.StackBranch, error) {
 	spiceBranches, err := s.spice.GetStack(ctx)

@@ -87,8 +87,13 @@ Examples:
 
 			// Create worktree
 			if !noSetup {
-				// Worktree creation will be implemented in next task
-				fmt.Fprintf(out, "Worktree path: %s\n", stackBranch.Path)
+				worktree, err := stackService.CreateWorktree(ctx, stackBranch.Name)
+				if err != nil {
+					Fatal("Failed to create worktree: %v", err)
+				}
+				fmt.Fprintf(out, "Created worktree: %s\n", worktree.Path)
+
+				// TODO: Run setup hooks (will be added in Phase 4)
 			}
 		},
 	}
