@@ -12,4 +12,5 @@ var worktreeCmd = &cobra.Command{
 
 func init() {
 	RegisterCommand(worktreeCmd)
+	// Subcommands are registered in their respective init() functions
 }
