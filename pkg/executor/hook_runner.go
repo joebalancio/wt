@@ -48,14 +48,14 @@ func (h *HookRunner) RunHook(ctx context.Context, hook config.Hook) error {
 		return fmt.Errorf("empty hook command")
 	}
 
+	// Add timeout
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	cmd.Dir = cwd
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	// Add timeout
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("running %q: %w", hook.Run, err)

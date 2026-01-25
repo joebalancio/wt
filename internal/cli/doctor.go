@@ -59,9 +59,8 @@ This command verifies that:
 			// Check repository (only if git is available)
 			if gitOK {
 				fmt.Fprintln(out, "\nChecking current repository...")
-				if !checkRepoDoctor(ctx, out, gitSpiceOK) {
-					// Git-spice missing is not critical for basic operations
-				}
+				checkRepoDoctor(ctx, out, gitSpiceOK)
+				// Git-spice missing is not critical for basic operations
 			}
 
 			// Summary
@@ -69,20 +68,22 @@ This command verifies that:
 			if allPass {
 				fmt.Fprintln(out, "All checks passed!")
 				os.Exit(0)
-			} else if gitOK {
+			}
+
+			// Some checks failed
+			if gitOK {
 				// Git is OK but other checks failed
 				os.Exit(2) // Warning
-			} else {
-				// Critical failure
-				os.Exit(1)
 			}
+			// Critical failure - git not available
+			os.Exit(1)
 		},
 	}
 
 	return cmd
 }
 
-func checkWTBinary(ctx context.Context, out io.Writer) bool {
+func checkWTBinary(_ context.Context, out io.Writer) bool {
 	// Get wt binary path
 	execPath, err := os.Executable()
 	if err != nil {

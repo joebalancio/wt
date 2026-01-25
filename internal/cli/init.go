@@ -54,7 +54,7 @@ and verifies that required dependencies (git, git-spice) are installed.`,
 	return cmd
 }
 
-func checkGit(ctx context.Context, out io.Writer) error {
+func checkGit(_ context.Context, out io.Writer) error {
 	_, err := git.NewClient()
 	if err != nil {
 		fmt.Fprintf(out, "✗ git not found\n")
