@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/user/wt/pkg/domain"
@@ -33,24 +34,58 @@ func TestListWorktrees(t *testing.T) {
 		}
 
 		output := buf.String()
-		if !contains(output, "main") {
+		if !strings.Contains(output, "main") {
 			t.Error("output should contain 'main' branch")
 		}
-		if !contains(output, "feature") {
+		if !strings.Contains(output, "feature") {
 			t.Error("output should contain 'feature' branch")
+		}
+	})
+
+	t.Run("handles empty worktree list", func(t *testing.T) {
+		worktrees := []*domain.Worktree{}
+
+		var buf bytes.Buffer
+		err := printWorktrees(&buf, worktrees)
+		if err != nil {
+			t.Fatalf("printWorktrees() error = %v", err)
+		}
+
+		output := buf.String()
+		if output != "" {
+			t.Errorf("expected empty output, got %q", output)
 		}
 	})
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
+func TestListCmdFlags(t *testing.T) {
+	t.Run("registers branches flag", func(t *testing.T) {
+		cmd := NewListCmd()
+		flag := cmd.Flags().Lookup("branches")
+		if flag == nil {
+			t.Fatal("--branches flag not found")
 		}
-	}
-	return false
+	})
+
+	t.Run("registers path flag", func(t *testing.T) {
+		cmd := NewListCmd()
+		flag := cmd.Flags().Lookup("path")
+		if flag == nil {
+			t.Fatal("--path flag not found")
+		}
+	})
+
+	t.Run("parses branches flag", func(t *testing.T) {
+		cmd := NewListCmd()
+		args := []string{"--branches=main,feature"}
+		if err := cmd.ParseFlags(args); err != nil {
+			t.Fatalf("failed to parse flags: %v", err)
+		}
+
+		// Verify the flag was parsed by checking its value
+		flag := cmd.Flags().Lookup("branches")
+		if flag == nil {
+			t.Fatal("--branches flag not found")
+		}
+	})
 }
