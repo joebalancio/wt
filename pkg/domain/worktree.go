@@ -95,3 +95,12 @@ type Branch struct {
 	SHA    string  // Commit SHA
 	Remote *string // Remote name (nil for local-only)
 }
+
+// StackBranch represents a branch in a git-spice stack
+type StackBranch struct {
+	Name     string         // Branch name
+	IsRoot   bool           // Is this the root of the stack
+	IsHead   bool           // Is this the current branch
+	Path     string         // Worktree path if checked out
+	Children []*StackBranch // Child branches
+}
