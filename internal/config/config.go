@@ -13,6 +13,7 @@ type Config struct {
 	Global    GlobalConfig     `yaml:"global"`
 	Hooks     HooksConfig      `yaml:"hooks"`
 	Tmux      TmuxConfig       `yaml:"tmux"`
+	Worktree  WorktreeConfig   `yaml:"worktree"`
 	Overrides []OverrideConfig `yaml:"project_overrides,omitempty"`
 }
 
@@ -43,6 +44,25 @@ type TmuxConfig struct {
 	AttachOnCreate bool   `yaml:"attach_on_create,omitempty"`
 }
 
+// WorktreeConfig contains worktree-specific settings
+type WorktreeConfig struct {
+	Location      string `yaml:"location"`       // "dedicated" or "per-repo"
+	DedicatedPath string `yaml:"dedicated_path"` // custom path for dedicated mode
+}
+
+// IsDedicated returns true if using dedicated worktree location
+func (w *WorktreeConfig) IsDedicated() bool {
+	return w.Location == "" || w.Location == "dedicated"
+}
+
+// GetDedicatedPath returns the dedicated path (with default fallback)
+func (w *WorktreeConfig) GetDedicatedPath() string {
+	if w.DedicatedPath != "" {
+		return w.DedicatedPath
+	}
+	return "~/worktrees" // default
+}
+
 // OverrideConfig allows project-specific overrides
 type OverrideConfig struct {
 	Match string      `yaml:"match"`
@@ -60,6 +80,10 @@ func DefaultConfig() *Config {
 			Layout:         "main-vertical",
 			WindowName:     "work",
 			AttachOnCreate: true,
+		},
+		Worktree: WorktreeConfig{
+			Location:      "dedicated",
+			DedicatedPath: "~/worktrees",
 		},
 	}
 }
