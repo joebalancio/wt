@@ -93,7 +93,10 @@ Examples:
 				}
 				fmt.Fprintf(out, "Created worktree: %s\n", worktree.Path)
 
-				// TODO: Run setup hooks (will be added in Phase 4)
+				// Run setup hooks
+				if err := runSetupHooks(ctx, worktree.Path); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+				}
 			}
 		},
 	}

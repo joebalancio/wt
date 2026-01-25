@@ -8,6 +8,7 @@ import (
 	"github.com/user/wt/internal/git"
 	"github.com/user/wt/internal/worktree"
 	"github.com/user/wt/pkg/domain"
+	"github.com/user/wt/pkg/executor"
 )
 
 // NewAddCmd creates the add command
@@ -62,6 +63,11 @@ If a branch with the same name already exists, the command will fail.`,
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Created worktree: %s [%s]\n", worktree.Path, worktree.Branch)
+
+			// Run setup hooks
+			if err := runSetupHooks(ctx, worktree.Path); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+			}
 		},
 	}
 
@@ -77,4 +83,15 @@ If a branch with the same name already exists, the command will fail.`,
 func init() {
 	// Register as a child of worktreeCmd
 	worktreeCmd.AddCommand(NewAddCmd())
+}
+
+// runSetupHooks executes post-create hooks for a worktree
+func runSetupHooks(ctx context.Context, worktreePath string) error {
+	cfg, err := loadConfigForCommand()
+	if err != nil {
+		return err
+	}
+
+	runner := executor.NewHookRunner(worktreePath)
+	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
 }
