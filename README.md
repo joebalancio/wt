@@ -58,12 +58,11 @@ Create a config file at `~/.config/wt/config.yaml` or `.wt.yaml` in your project
 ```yaml
 global:
   worktree_root: ~/dev/worktrees
-  tmux_session_prefix: "wt-"
 
 hooks:
   on_worktree_create:
     - run: "npm install"
-      cwd: "{worktree_path}"
+      cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
       background: false
 ```
 

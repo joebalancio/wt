@@ -175,24 +175,23 @@ wt uses YAML configuration files that are searched in the following order:
 # Global settings
 global:
   worktree_root: ~/dev/worktrees        # Base directory for worktrees
-  tmux_session_prefix: "wt-"             # Prefix for tmux sessions (future)
 
 # Hooks run automatically after worktree operations
 hooks:
   on_worktree_create:
     - run: "npm install"
-      cwd: "{worktree_path}"             # Expands to the worktree path
+      cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
       background: false                  # Run synchronously
       parallel: false                    # Can run with other parallel hooks
 
     - run: "npm run build"
-      cwd: "{worktree_path}"
+      cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
       background: true                   # Run asynchronously
       parallel: true                     # Can run in parallel with other parallel hooks
 
   on_worktree_remove:
     - run: "rm -rf node_modules"
-      cwd: "{worktree_path}"
+      cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
 
 # Project-specific overrides using glob patterns
 project_overrides:
@@ -200,27 +199,18 @@ project_overrides:
     hooks:
       on_worktree_create:
         - run: "cargo fetch"
-          cwd: "{worktree_path}"
-
-# Tmux settings (future feature)
-tmux:
-  layout: "main-vertical"                # Tmux layout
-  window_name: "work"                    # Initial window name
-  attach_on_create: true                 # Auto-attach after session creation
+          cwd: "{worktree_path}"         # Template expansion NOT YET IMPLEMENTED
 ```
 
-### Configuration Commands
+**IMPORTANT LIMITATIONS:**
 
-```bash
-# Initialize a new config file
-wt config init
+- **Hook Template Expansion**: The `{worktree_path}` template is NOT yet implemented. When specifying `cwd`, use absolute paths or relative paths from your current directory. This feature is planned for a future release.
 
-# Validate your current configuration
-wt config validate
+**NOT IMPLEMENTED - Future Features:**
 
-# Show the configuration being used
-wt config show
-```
+The following configuration sections are documented but NOT implemented in the current version:
+- `global.tmux_session_prefix` - Tmux integration is planned for a future release
+- `tmux.*` section - All tmux configuration and session management is not yet available
 
 ---
 
@@ -270,17 +260,19 @@ Configure hooks to automatically set up your environment:
 hooks:
   on_worktree_create:
     - run: "npm install"
-      cwd: "{worktree_path}"
+      cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
       background: true
       parallel: true
 
     - run: "npm run build"
-      cwd: "{worktree_path}"
+      cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
       background: true
       parallel: true
 ```
 
 Now when you run `wt worktree add feature/new`, dependencies are installed and the project is built automatically in the background.
+
+**Note**: The `{worktree_path}` template expansion is not yet implemented. Use absolute paths or manage working directories manually for now.
 
 ### Cleaning Up Old Worktrees
 
