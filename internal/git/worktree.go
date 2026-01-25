@@ -171,6 +171,20 @@ func (c *Client) BranchExists(ctx context.Context, branch string) (bool, error) 
 	return true, nil
 }
 
+// GetCurrentBranch returns the current branch name
+func (c *Client) GetCurrentBranch(ctx context.Context) (string, error) {
+	var stdout bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, "symbolic-ref", "--short", "HEAD")
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		// Might be detached HEAD
+		return "", fmt.Errorf("not on any branch: %w", err)
+	}
+
+	return strings.TrimSpace(stdout.String()), nil
+}
+
 // PruneWorktrees removes stale worktrees.
 //
 // Note: This is a utility method that is not part of the GitClient interface.
