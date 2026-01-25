@@ -7,11 +7,11 @@ run:
   # Include test files
   tests: true
   # Which dirs to skip
-  skip-dirs:
+  exclude-dirs:
     - vendor
     - bin
   # Which files to skip
-  skip-files:
+  exclude-files:
     - ".*\\.pb\\.go$"
 
 output:
@@ -22,8 +22,6 @@ output:
   print-issued-lines: true
   # Print linter name in the end of issue text
   print-linter-name: true
-  # Make issues output unique by line
-  uniq-by-line: true
   # Sort results by: filepath, line and column
   sort-results: true
 
@@ -121,10 +119,13 @@ issues:
   max-same-issues: 0
   # Show only new issues
   new: false
+  # Make issues output unique by line
+  uniq-by-line: true
   # Exclude specific issues
   exclude-rules:
     # Exclude some linters from running on tests files
     - path: _test\.go
       linters:
         - gocyclo
+        - gocognit
         - errcheck

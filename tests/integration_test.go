@@ -401,7 +401,7 @@ func TestIntegration_RemoveNonExistentWorktree(t *testing.T) {
 	}
 
 	// Try to remove a worktree that doesn't exist
- nonexistentPath := filepath.Join(repoPath, "non-existent-worktree")
+	nonexistentPath := filepath.Join(repoPath, "non-existent-worktree")
 	err = client.RemoveWorktree(ctx, nonexistentPath, false)
 
 	// This should fail
@@ -635,8 +635,7 @@ func TestIntegration_WorktreeFilter(t *testing.T) {
 		"feature/two",
 		"bugfix/three",
 	}
-
-	var paths []string
+	paths := make([]string, 0, len(branches))
 	for _, branch := range branches {
 		spec := domain.WorktreeCreateSpec{
 			Branch: branch,

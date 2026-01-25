@@ -72,14 +72,14 @@ func TestExecutor_Run_ContextCancellation(t *testing.T) {
 	e := New()
 	e.SetTimeout(100 * time.Millisecond)
 
-	// Create a context that's already cancelled
+	// Create a context that's already canceled
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	result := e.Run(ctx, "", "sleep 1")
 
 	if result.Success {
-		t.Fatal("expected failure for cancelled context, got success")
+		t.Fatal("expected failure for canceled context, got success")
 	}
 }
 

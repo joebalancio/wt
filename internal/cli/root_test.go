@@ -14,7 +14,7 @@ func TestRootCommand(t *testing.T) {
 		{"no args", []string{}, 0},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Set args for this test
 			// In real tests, you'd use ExecuteC or similar
 			_ = tt.args

@@ -59,7 +59,7 @@ func (m *mockGitClient) BranchExists(ctx context.Context, branch string) (bool, 
 func TestService_List(t *testing.T) {
 	t.Run("returns all worktrees", func(t *testing.T) {
 		mock := &mockGitClient{
-			listWorktreesFunc: func(ctx context.Context) ([]*domain.Worktree, error) {
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
 				return []*domain.Worktree{
 					{Path: "/main", Branch: "main"},
 					{Path: "/feature", Branch: "feature"},
@@ -83,7 +83,7 @@ func TestService_List(t *testing.T) {
 
 	t.Run("returns error when git client fails", func(t *testing.T) {
 		mock := &mockGitClient{
-			listWorktreesFunc: func(ctx context.Context) ([]*domain.Worktree, error) {
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
 				return nil, fmt.Errorf("git command failed")
 			},
 		}
@@ -115,7 +115,7 @@ func TestService_List(t *testing.T) {
 
 	t.Run("filters by branch name", func(t *testing.T) {
 		mock := &mockGitClient{
-			listWorktreesFunc: func(ctx context.Context) ([]*domain.Worktree, error) {
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
 				return []*domain.Worktree{
 					{Path: "/main", Branch: "main"},
 					{Path: "/feature", Branch: "feature"},
@@ -145,7 +145,7 @@ func TestService_List(t *testing.T) {
 func TestService_Add(t *testing.T) {
 	t.Run("creates new worktree", func(t *testing.T) {
 		mock := &mockGitClient{
-			addWorktreeFunc: func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+			addWorktreeFunc: func(_ context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
 				return &domain.Worktree{
 					Path:   "/test/" + spec.Branch,
 					Branch: spec.Branch,
@@ -193,7 +193,7 @@ func TestService_Add(t *testing.T) {
 
 	t.Run("returns error when git client fails", func(t *testing.T) {
 		mock := &mockGitClient{
-			addWorktreeFunc: func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+			addWorktreeFunc: func(_ context.Context, _ domain.WorktreeCreateSpec) (*domain.Worktree, error) {
 				return nil, fmt.Errorf("git worktree add failed")
 			},
 		}
@@ -218,7 +218,7 @@ func TestService_Add(t *testing.T) {
 func TestService_Remove(t *testing.T) {
 	t.Run("removes worktree", func(t *testing.T) {
 		mock := &mockGitClient{
-			removeWorktreeFunc: func(ctx context.Context, path string, force bool) error {
+			removeWorktreeFunc: func(_ context.Context, _ string, _ bool) error {
 				return nil
 			},
 		}
@@ -253,7 +253,7 @@ func TestService_Remove(t *testing.T) {
 
 	t.Run("returns error when git client fails", func(t *testing.T) {
 		mock := &mockGitClient{
-			removeWorktreeFunc: func(ctx context.Context, path string, force bool) error {
+			removeWorktreeFunc: func(_ context.Context, _ string, _ bool) error {
 				return fmt.Errorf("git worktree remove failed")
 			},
 		}

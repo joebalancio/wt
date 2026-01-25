@@ -11,6 +11,7 @@ import (
 )
 
 // GitClient defines the interface for git operations
+// revive:disable:exported Type name stutter is acceptable for clarity
 type GitClient interface {
 	ListWorktrees(ctx context.Context) ([]*domain.Worktree, error)
 	AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error)

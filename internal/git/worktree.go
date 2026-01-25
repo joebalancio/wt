@@ -50,11 +50,9 @@ func (c *Client) AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec
 		args = append(args, "--force")
 	}
 
-	if spec.Base != "" {
-		args = append(args, "-b", spec.Branch, spec.Base)
-	} else {
-		args = append(args, spec.Branch)
-	}
+	// Always create a new branch with -b flag
+	// Syntax: git worktree add [-b <new-branch>] <path> [<start-point>]
+	args = append(args, "-b", spec.Branch)
 
 	path := spec.Path
 	if path == "" {
@@ -64,6 +62,11 @@ func (c *Client) AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec
 
 	args = append(args, path)
 
+	// Optional: start point (commit/branch to create from)
+	if spec.Base != "" {
+		args = append(args, spec.Base)
+	}
+
 	if !spec.Checkout {
 		args = append(args, "--no-checkout")
 	}
@@ -72,9 +75,12 @@ func (c *Client) AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec
 		args = append(args, "--track", *spec.Track)
 	}
 
+	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("adding worktree: %w", err)
+		return nil, fmt.Errorf("adding worktree: %w: %s", err, stderr.String())
 	}
 
 	// Convert path to absolute
@@ -97,9 +103,12 @@ func (c *Client) RemoveWorktree(ctx context.Context, path string, force bool) er
 	}
 	args = append(args, path)
 
+	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("removing worktree: %w", err)
+		return fmt.Errorf("removing worktree: %w: %s", err, stderr.String())
 	}
 	return nil
 }
@@ -151,7 +160,9 @@ func (c *Client) BranchExists(ctx context.Context, branch string) (bool, error) 
 		// rev-parse returns non-zero if branch doesn't exist
 		// Check if the error is specifically about the branch not existing
 		errMsg := stderr.String()
-		if strings.Contains(errMsg, "unknown revision") || strings.Contains(errMsg, "needed but is an unborn ref") {
+		if strings.Contains(errMsg, "unknown revision") ||
+			strings.Contains(errMsg, "needed but is an unborn ref") ||
+			strings.Contains(errMsg, "Needed a single revision") {
 			return false, nil
 		}
 		// Some other error occurred (e.g., git not found, not in a git repo)
@@ -175,7 +186,7 @@ func (c *Client) PruneWorktrees(ctx context.Context) error {
 
 func parseWorktreeOutput(output string) ([]*domain.Worktree, error) {
 	var worktrees []*domain.Worktree
-	var currentIndex int = -1
+	currentIndex := -1
 
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {

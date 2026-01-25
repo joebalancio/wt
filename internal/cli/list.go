@@ -30,7 +30,7 @@ func NewListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List git worktrees",
 		Long:  `List all git worktrees in the current repository.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			ctx := context.Background()
 
 			gitClient, err := git.NewClient()

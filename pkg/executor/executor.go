@@ -105,7 +105,7 @@ func (e *Executor) RunParallel(ctx context.Context, hooks []HookDefinition) []Ho
 	resultChan := make(chan *HookResult, len(hooks))
 
 	for i, hook := range hooks {
-		go func(idx int, h HookDefinition) {
+		go func(_ int, h HookDefinition) {
 			resultChan <- e.Run(ctx, h.Workdir, h.Command)
 		}(i, hook)
 	}

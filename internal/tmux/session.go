@@ -103,9 +103,9 @@ func (c *Client) KillSession(name string) error {
 }
 
 func parseSessionList(output string) ([]Session, error) {
-	var sessions []Session
-
 	lines := strings.Split(strings.TrimSpace(output), "\n")
+	sessions := make([]Session, 0, len(lines))
+
 	for _, line := range lines {
 		if line == "" {
 			continue
