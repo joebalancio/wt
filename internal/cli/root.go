@@ -32,22 +32,14 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "show what would be done without executing")
 
 	// Make `wt` (no args) equivalent to `wt worktree list`
-	rootCmd.Run = func(cmd *cobra.Command, args []string) {
-		// Find worktree command
-		for _, subcmd := range rootCmd.Commands() {
-			if subcmd.Name() == "worktree" {
-				// Find list command under worktree
-				for _, worktreeSubcmd := range subcmd.Commands() {
-					if worktreeSubcmd.Name() == "list" {
-						worktreeSubcmd.Run(cmd, args)
-						return
-					}
-				}
-				Fatal("list command not found")
-				return
-			}
+	// This uses Cobra's execution pipeline to ensure all hooks run correctly
+	rootCmd.Run = func(cmd *cobra.Command, _ []string) {
+		// Use SetArgs and Execute to properly dispatch through Cobra's pipeline
+		cmd.SetArgs([]string{"worktree", "list"})
+		if err := cmd.Execute(); err != nil {
+			// Execute already prints the error, just exit
+			os.Exit(1)
 		}
-		Fatal("worktree command not found")
 	}
 }
 
