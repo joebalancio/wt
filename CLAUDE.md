@@ -105,6 +105,25 @@ Config is loaded in this priority order (internal/config/config.go:FindConfig):
 2. `.wt.yaml` in current directory
 3. `~/.config/wt/config.yaml` (XDG standard)
 
+**Worktree Location Configuration**
+
+The `worktree.location` setting in config determines where worktrees are created:
+
+- **dedicated mode** (default): Worktrees are created in a dedicated directory
+  - Default path: `~/worktrees`
+  - Custom path via `worktree.dedicated_path` in config
+  - Example: `~/worktrees/feat/auth-api`
+
+- **per-repo mode**: Worktrees are created within the repository
+  - Path: `<repo-root>/.worktrees/<branch>`
+  - Example: `/path/to/repo/.worktrees/feat/auth-api`
+
+This configuration is used consistently across:
+- `internal/worktree/service.ResolvePath()` - Resolves paths for worktree commands
+- `internal/stack/service.getWorktreePath()` - Resolves paths for stack commands
+
+Both services use the same logic: check `cfg.Worktree.IsDedicated()` and call `cfg.Worktree.GetDedicatedPath()` when in dedicated mode.
+
 **3. Hook Execution Flow**
 
 Hooks are defined in config with these fields:
@@ -156,7 +175,7 @@ Tmux returns errors when:
 
 **Configuration Templates**
 
-Hook commands support `{worktree_path}` template variable. This is expanded before execution (not yet implemented in current code - this is a TODO for hook execution).
+Hook commands support `{worktree_path}` template variable. This is expanded before execution in `pkg/executor/hook_runner.go`. The template is replaced with the actual worktree path when hooks are run.
 
 ### Development Notes
 
