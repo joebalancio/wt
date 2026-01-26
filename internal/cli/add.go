@@ -33,23 +33,6 @@ If a branch with the same name already exists, the command will fail.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			branch := args[0]
 
-			if GetDryRun() {
-				fmt.Fprintf(cmd.OutOrStdout(), "Would create worktree for branch: %s\n", branch)
-				if base != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "  Base branch: %s\n", base)
-				}
-				if path != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "  Path: %s\n", path)
-				}
-				if track != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "  Track: %s\n", track)
-				}
-				if noCheckout {
-					fmt.Fprintf(cmd.OutOrStdout(), "  No checkout: true\n")
-				}
-				return
-			}
-
 			ctx := context.Background()
 
 			gitClient, err := git.NewClient()

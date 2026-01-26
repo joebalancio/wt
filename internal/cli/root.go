@@ -29,14 +29,6 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default is $HOME/.config/wt/config.yaml or .wt.yaml in project)")
 	rootCmd.PersistentFlags().CountP("verbose", "v", "verbose output (can be used multiple times)")
-	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "show what would be done without executing")
-}
-
-var dryRun bool
-
-// GetDryRun returns the global dry-run flag value
-func GetDryRun() bool {
-	return dryRun
 }
 
 // Verbose returns the verbosity level
