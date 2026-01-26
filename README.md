@@ -110,6 +110,10 @@ See [docs/usage.md](docs/usage.md) for detailed usage examples and command refer
 Create a config file at `~/.config/wt/config.yaml` or `.wt.yaml` in your project:
 
 ```yaml
+# Git-spice configuration for branch stacking
+spice:
+  binary_path: ""  # Auto-detected via 'wt init', or set manually
+
 worktree:
   location: dedicated      # "dedicated" or "per-repo"
   dedicated_path: ~/worktrees  # custom path for dedicated mode

@@ -41,3 +41,17 @@ tmux:
 
   # Automatically attach to session after creation
   attach_on_create: true
+
+# Git-spice configuration for branch stacking
+spice:
+  # Path to git-spice binary. Set this via 'wt init' for auto-detection.
+  # If empty, stacking commands will prompt you to run 'wt init'.
+  binary_path: ""  # Example: "/usr/local/bin/git-spice" or "C:\\Users\\you\\.cargo\\bin\\git-spice.exe"
+
+# Worktree settings
+worktree:
+  # Location mode: "dedicated" (outside repo) or "per-repo" (inside repo)
+  location: "dedicated"
+
+  # Custom path for dedicated mode (default: ~/worktrees)
+  dedicated_path: "~/worktrees"
