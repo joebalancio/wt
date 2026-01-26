@@ -3,6 +3,9 @@ package worktree
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/user/wt/internal/config"
 	"github.com/user/wt/internal/git"
@@ -62,6 +65,35 @@ func (s *Service) Add(ctx context.Context, spec domain.WorktreeCreateSpec) (*dom
 	}
 
 	return worktree, nil
+}
+
+// ResolvePath returns the worktree path for a branch.
+// If explicitPath is provided, it's used as-is.
+// Otherwise, path is resolved from config based on worktree.location setting.
+func (s *Service) ResolvePath(ctx context.Context, branch string, explicitPath string) (string, error) {
+	if explicitPath != "" {
+		return explicitPath, nil
+	}
+
+	if s.cfg.Worktree.IsDedicated() {
+		dedicatedPath := s.cfg.Worktree.GetDedicatedPath()
+		// Expand ~ to home directory
+		if strings.HasPrefix(dedicatedPath, "~/") {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("getting home directory: %w", err)
+			}
+			dedicatedPath = filepath.Join(home, dedicatedPath[2:])
+		}
+		return filepath.Join(dedicatedPath, branch), nil
+	}
+
+	// per-repo mode
+	repoInfo, err := s.git.GetRepoInfo(ctx)
+	if err != nil {
+		return "", fmt.Errorf("getting repo info: %w", err)
+	}
+	return filepath.Join(repoInfo.RootPath, ".worktrees", branch), nil
 }
 
 // Remove removes a worktree
