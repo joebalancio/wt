@@ -14,6 +14,7 @@ type Config struct {
 	Hooks     HooksConfig      `yaml:"hooks"`
 	Tmux      TmuxConfig       `yaml:"tmux"`
 	Worktree  WorktreeConfig   `yaml:"worktree"`
+	Spice     SpiceConfig      `yaml:"spice"`
 	Overrides []OverrideConfig `yaml:"project_overrides,omitempty"`
 }
 
@@ -49,6 +50,11 @@ type WorktreeConfig struct {
 	DedicatedPath string `yaml:"dedicated_path"` // custom path for dedicated mode
 }
 
+// SpiceConfig contains git-spice specific settings
+type SpiceConfig struct {
+	BinaryPath string `yaml:"binary_path"` // Path to git-spice binary
+}
+
 // IsDedicated returns true if using dedicated worktree location
 func (w *WorktreeConfig) IsDedicated() bool {
 	return w.Location == "" || w.Location == "dedicated"
@@ -82,6 +88,9 @@ func DefaultConfig() *Config {
 		Worktree: WorktreeConfig{
 			Location:      "dedicated",
 			DedicatedPath: "~/worktrees",
+		},
+		Spice: SpiceConfig{
+			BinaryPath: "", // Empty means not configured
 		},
 	}
 }

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
 	"github.com/joebalancio/wt/pkg/executor"
+	"github.com/spf13/cobra"
 )
 
 // NewAddCmd creates the add command

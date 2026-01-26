@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/config"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
 	"github.com/joebalancio/wt/internal/stack"
+	"github.com/spf13/cobra"
 )
 
 // NewStackCmd creates the stack command group
@@ -63,14 +63,19 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		Fatal("Failed to create git client: %v", err)
 	}
 
-	spiceClient, err := spice.NewClient()
-	if err != nil {
-		Fatal("Failed to create git-spice client: %v", err)
-	}
-
 	cfg, err := loadConfigForCommand()
 	if err != nil {
 		Fatal("Failed to load config: %v", err)
+	}
+
+	// Validate git-spice configuration early
+	if err := validateGitSpiceConfig(cfg); err != nil {
+		Fatal("%v", err)
+	}
+
+	spiceClient, err := spice.NewClient(cfg)
+	if err != nil {
+		Fatal("Failed to create spice client: %v", err)
 	}
 
 	stackService, err := stack.NewService(gitClient, spiceClient, cfg)
@@ -129,15 +134,20 @@ func NewStackListCmd() *cobra.Command {
 				Fatal("Failed to create git client: %v", err)
 			}
 
-			spiceClient, err := spice.NewClient()
-			if err != nil {
-				Fatal("Failed to create git-spice client: %v", err)
-			}
-
 			// Load config
 			cfg, err := loadConfigForCommand()
 			if err != nil {
 				Fatal("Failed to load config: %v", err)
+			}
+
+			// Validate git-spice configuration early
+			if err := validateGitSpiceConfig(cfg); err != nil {
+				Fatal("%v", err)
+			}
+
+			spiceClient, err := spice.NewClient(cfg)
+			if err != nil {
+				Fatal("Failed to create spice client: %v", err)
 			}
 
 			// Create stack service
@@ -187,6 +197,19 @@ func loadConfigForCommand() (*config.Config, error) {
 		return config.DefaultConfig(), nil
 	}
 	return config.Load(configPath)
+}
+
+// validateGitSpiceConfig validates git-spice configuration
+// Returns an error if git-spice is not configured
+func validateGitSpiceConfig(cfg *config.Config) error {
+	if cfg.Spice.BinaryPath == "" {
+		return fmt.Errorf("git-spice not configured.\n\n" +
+			"Run 'wt init' to configure git-spice.\n\n" +
+			"Install git-spice first if needed:\n" +
+			"  cargo install git-spice\n" +
+			"  brew install git-spice")
+	}
+	return nil
 }
 
 func init() {

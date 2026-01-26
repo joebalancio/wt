@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/git"
+	"github.com/spf13/cobra"
 )
 
 // NewSetupCmd creates the setup command

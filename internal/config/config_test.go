@@ -52,3 +52,11 @@ func TestDefaultConfig_HasWorktreeSettings(t *testing.T) {
 		t.Errorf("default dedicated path = %v, want ~/worktrees", cfg.Worktree.GetDedicatedPath())
 	}
 }
+
+func TestSpiceConfig_DefaultValues(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.Spice.BinaryPath != "" {
+		t.Errorf("expected empty BinaryPath, got %q", cfg.Spice.BinaryPath)
+	}
+}

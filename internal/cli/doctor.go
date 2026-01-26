@@ -11,10 +11,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/config"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
+	"github.com/spf13/cobra"
 )
 
 // NewDoctorCmd creates the doctor command
@@ -127,7 +127,13 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 	fmt.Fprintf(out, "✓ git worktree supported\n")
 
 	// Check git-spice
-	spiceClient, err := spice.NewClient()
+	cfg, err := loadConfigForCommand()
+	if err != nil {
+		fmt.Fprintf(out, "! Failed to load config: %v\n", err)
+		return true, false
+	}
+
+	spiceClient, err := spice.NewClient(cfg)
 	if err != nil {
 		fmt.Fprintf(out, "! git-spice not found (required for stacking)\n")
 		fmt.Fprintf(out, "  Install with: cargo install git-spice\n")
@@ -235,15 +241,20 @@ func checkRepoDoctor(ctx context.Context, out io.Writer, gitSpiceOK bool) bool {
 
 	// Check git-spice stack if available
 	if gitSpiceOK {
-		spiceClient, err := spice.NewClient()
-		if err == nil {
-			stack, err := spiceClient.GetStack(ctx)
-			if err != nil {
-				fmt.Fprintf(out, "! Cannot get git-spice stack: %v\n", err)
-			} else if len(stack) == 0 {
-				fmt.Fprintf(out, "! No git-spice stack found (not a stacked branch)\n")
-			} else {
-				fmt.Fprintf(out, "✓ Stacked branch detected (%d branches in stack)\n", len(stack))
+		cfg, err := loadConfigForCommand()
+		if err != nil {
+			fmt.Fprintf(out, "! Failed to load config: %v\n", err)
+		} else {
+			spiceClient, err := spice.NewClient(cfg)
+			if err == nil {
+				stack, err := spiceClient.GetStack(ctx)
+				if err != nil {
+					fmt.Fprintf(out, "! Cannot get git-spice stack: %v\n", err)
+				} else if len(stack) == 0 {
+					fmt.Fprintf(out, "! No git-spice stack found (not a stacked branch)\n")
+				} else {
+					fmt.Fprintf(out, "✓ Stacked branch detected (%d branches in stack)\n", len(stack))
+				}
 			}
 		}
 	}

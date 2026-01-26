@@ -27,6 +27,14 @@ sudo mv bin/wt /usr/local/bin/
 go install github.com/user/wt@latest
 ```
 
+### Optional: git-spice (for stacking)
+
+git-spice enables branch stacking features. Install via:
+- `cargo install git-spice`
+- `brew install git-spice`
+
+Run `wt init` after installing to configure automatically.
+
 ## Quick Start
 
 ```bash
@@ -63,12 +71,16 @@ WT v2 integrates with [git-spice](https://github.com/abhinav/git-spice) for bran
    brew install git-spice
    ```
 
-2. Initialize wt:
+2. Initialize wt (auto-detects and configures git-spice):
    ```bash
    wt init
    ```
 
+> **Note**: wt uses the "git-spice" command by default to avoid conflicts with Ghostscript's "gs". If you have the "gs" alias configured, ensure your config uses "git-spice".
+
 ### Basic Stacking Workflow
+
+Stack commands require git-spice to be installed and configured. Run `wt doctor` to verify your setup.
 
 ```bash
 # Create root branch
@@ -110,6 +122,10 @@ See [docs/usage.md](docs/usage.md) for detailed usage examples and command refer
 Create a config file at `~/.config/wt/config.yaml` or `.wt.yaml` in your project:
 
 ```yaml
+# Git-spice configuration for branch stacking
+spice:
+  binary_path: ""  # Auto-detected via 'wt init', or set manually to e.g. "/usr/local/bin/git-spice"
+
 worktree:
   location: dedicated      # "dedicated" or "per-repo"
   dedicated_path: ~/worktrees  # custom path for dedicated mode
@@ -120,6 +136,14 @@ hooks:
       cwd: "{worktree_path}"  # Supports template variable
       background: false
 ```
+
+### Git-Spice Configuration
+
+The `spice.binary_path` setting specifies the git-spice binary location.
+- Run `wt init` for automatic detection and configuration
+- Or set manually: `binary_path: "/usr/local/bin/git-spice"`
+
+**Note**: wt uses "git-spice" command by default to avoid conflicts with Ghostscript's "gs". If your git-spice is installed as "gs", run `wt init` to update your config automatically.
 
 See [configs/example.yaml](configs/example.yaml) for a complete example.
 

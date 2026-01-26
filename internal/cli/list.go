@@ -6,10 +6,10 @@ import (
 	"io"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
+	"github.com/spf13/cobra"
 )
 
 // printWorktrees prints worktrees to the given writer
