@@ -54,13 +54,11 @@ func (c *Client) AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec
 	// Syntax: git worktree add [-b <new-branch>] <path> [<start-point>]
 	args = append(args, "-b", spec.Branch)
 
-	path := spec.Path
-	if path == "" {
-		// Auto-generate path from branch name
-		path = filepath.Join(".", spec.Branch)
+	if spec.Path == "" {
+		return nil, fmt.Errorf("spec.Path is required")
 	}
-
-	args = append(args, path)
+	args = append(args, spec.Path)
+	path := spec.Path
 
 	// Optional: start point (commit/branch to create from)
 	if spec.Base != "" {
