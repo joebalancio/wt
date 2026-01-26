@@ -24,6 +24,14 @@ Use --force to remove it anyway.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			path := args[0]
 
+			if GetDryRun() {
+				fmt.Fprintf(cmd.OutOrStdout(), "Would remove worktree: %s\n", path)
+				if force {
+					fmt.Fprintf(cmd.OutOrStdout(), "  Force: true\n")
+				}
+				return
+			}
+
 			ctx := context.Background()
 
 			gitClient, err := git.NewClient()
