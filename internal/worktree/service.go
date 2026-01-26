@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/user/wt/internal/config"
 	"github.com/user/wt/internal/git"
 	"github.com/user/wt/pkg/domain"
 )
@@ -11,15 +12,20 @@ import (
 // Service provides worktree management operations
 type Service struct {
 	git git.GitClient
+	cfg *config.Config
 }
 
 // NewService creates a new worktree service
-func NewService(gitClient git.GitClient) (*Service, error) {
+func NewService(gitClient git.GitClient, cfg *config.Config) (*Service, error) {
 	if gitClient == nil {
 		return nil, fmt.Errorf("gitClient cannot be nil")
 	}
+	if cfg == nil {
+		cfg = config.DefaultConfig()
+	}
 	return &Service{
 		git: gitClient,
+		cfg: cfg,
 	}, nil
 }
 
