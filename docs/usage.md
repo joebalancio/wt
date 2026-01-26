@@ -6,9 +6,9 @@ This guide provides detailed usage examples for all wt commands.
 
 - [Global Options](#global-options)
 - [Worktree Commands](#worktree-commands)
-  - [wt worktree add](#wt-worktree-add)
-  - [wt worktree list](#wt-worktree-list)
-  - [wt worktree remove](#wt-worktree-remove)
+  - [wt add](#wt-add)
+  - [wt list](#wt-list)
+  - [wt remove](#wt-remove)
 - [Configuration](#configuration)
 - [Common Workflows](#common-workflows)
 
@@ -28,27 +28,27 @@ These options can be used with any wt command:
 
 ```bash
 # Use a custom config file
-wt -c /path/to/custom.yaml worktree list
+wt -c /path/to/custom.yaml list
 
 # Run in verbose mode
-wt -v worktree add feature-branch
+wt -v add feature-branch
 
 # See what would happen without making changes
-wt --dry-run worktree remove /path/to/worktree
+wt --dry-run remove /path/to/worktree
 ```
 
 ---
 
 ## Worktree Commands
 
-### wt worktree add
+### wt add
 
 Add a new worktree for the specified branch.
 
 **Synopsis:**
 
 ```bash
-wt worktree add <branch> [flags]
+wt add <branch> [flags]
 ```
 
 **Flags:**
@@ -64,16 +64,16 @@ wt worktree add <branch> [flags]
 
 ```bash
 # Create a new branch from current HEAD and add worktree
-wt worktree add feature/login
+wt add feature/login
 
 # Create a new branch from main and add worktree
-wt worktree add feature/auth --base main
+wt add feature/auth --base main
 
 # Create a worktree at a custom path
-wt worktree add hotfix-123 --path ~/projects/hotfix
+wt add hotfix-123 --path ~/projects/hotfix
 
 # Create worktree without checking out files
-wt worktree add experiment --no-checkout
+wt add experiment --no-checkout
 ```
 
 **How it works:**
@@ -85,14 +85,14 @@ wt worktree add experiment --no-checkout
 
 ---
 
-### wt worktree list
+### wt list
 
 List all git worktrees in the current repository.
 
 **Synopsis:**
 
 ```bash
-wt worktree list [flags]
+wt list [flags]
 ```
 
 **Flags:**
@@ -106,13 +106,13 @@ wt worktree list [flags]
 
 ```bash
 # List all worktrees
-wt worktree list
+wt list
 
 # Filter by specific branches
-wt worktree list --branches feature/login,feature/auth
+wt list --branches feature/login,feature/auth
 
 # Filter by path prefix
-wt worktree list --path ~/projects/
+wt list --path ~/projects/
 
 # Running wt without arguments is equivalent to list
 wt
@@ -128,14 +128,14 @@ wt
 
 ---
 
-### wt worktree remove
+### wt remove
 
 Remove a worktree from the repository.
 
 **Synopsis:**
 
 ```bash
-wt worktree remove <path> [flags]
+wt remove <path> [flags]
 ```
 
 **Flags:**
@@ -148,10 +148,10 @@ wt worktree remove <path> [flags]
 
 ```bash
 # Remove a worktree (fails if there are uncommitted changes)
-wt worktree remove /path/to/worktree
+wt remove /path/to/worktree
 
 # Force removal even with uncommitted changes
-wt worktree remove /path/to/worktree --force
+wt remove /path/to/worktree --force
 ```
 
 **Safety:** By default, removal will fail if the worktree has uncommitted changes. Use `--force` to override this safety check.
@@ -217,7 +217,7 @@ The following configuration sections are documented but NOT implemented in the c
 
 ```bash
 # Create a new feature branch from main
-wt worktree add feature/new-auth --base main
+wt add feature/new-auth --base main
 
 # The worktree is created at ~/dev/worktrees/feature/new-auth
 # You can now work on the feature in isolation
@@ -227,23 +227,23 @@ wt worktree add feature/new-auth --base main
 
 ```bash
 # Create a worktree for a bugfix
-wt worktree add bugfix/crash-on-login
+wt add bugfix/crash-on-login
 
 # Make your changes, commit them
 # When done, remove the worktree
-wt worktree remove ~/dev/worktrees/bugfix/crash-on-login
+wt remove ~/dev/worktrees/bugfix/crash-on-login
 ```
 
 ### Testing Multiple Branches
 
 ```bash
 # Create worktrees for multiple feature branches
-wt worktree add feature/a
-wt worktree add feature/b
-wt worktree add feature/c
+wt add feature/a
+wt add feature/b
+wt add feature/c
 
 # List all your worktrees
-wt worktree list
+wt list
 
 # Test each feature in its isolated environment
 ```
@@ -267,7 +267,7 @@ hooks:
       parallel: true
 ```
 
-Now when you run `wt worktree add feature/new`, dependencies are installed and the project is built automatically in the background.
+Now when you run `wt add feature/new`, dependencies are installed and the project is built automatically in the background.
 
 **Note**: The `{worktree_path}` template expansion is not yet implemented. Use absolute paths or manage working directories manually for now.
 
@@ -275,10 +275,10 @@ Now when you run `wt worktree add feature/new`, dependencies are installed and t
 
 ```bash
 # List all worktrees to find old ones
-wt worktree list
+wt list
 
 # Remove worktrees you no longer need
-wt worktree remove ~/dev/worktrees/old-feature
+wt remove ~/dev/worktrees/old-feature
 ```
 
 ---
