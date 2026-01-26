@@ -81,8 +81,7 @@ If a branch with the same name already exists, the command will fail.`,
 }
 
 func init() {
-	// Register as a child of worktreeCmd
-	worktreeCmd.AddCommand(NewAddCmd())
+	RegisterCommand(NewAddCmd())
 }
 
 // runSetupHooks executes post-create hooks for a worktree
