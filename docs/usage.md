@@ -80,8 +80,11 @@ wt add experiment --no-checkout
 
 1. The command ALWAYS creates a new branch with the specified name
 2. The new branch is created from the base branch (default: current HEAD)
-3. The worktree is created at `<worktree_root>/<branch>` by default, or at a custom path if specified
-4. If a branch with the same name already exists, the command will fail
+3. The worktree path is determined by your `worktree.location` configuration:
+   - **Dedicated mode** (default): `worktree.dedicated_path/<branch>` (e.g., `~/worktrees/feature/login`)
+   - **Per-repo mode**: `<repo>/.worktrees/<branch>`
+4. Use `--path` to override the default location
+5. If a branch with the same name already exists, the command will fail
 
 ---
 
@@ -169,9 +172,10 @@ wt uses YAML configuration files that are searched in the following order:
 ### Configuration Options
 
 ```yaml
-# Global settings
-global:
-  worktree_root: ~/dev/worktrees        # Base directory for worktrees
+# Worktree location configuration
+worktree:
+  location: dedicated                    # "dedicated" or "per-repo"
+  dedicated_path: ~/worktrees            # Used when location is "dedicated"
 
 # Hooks run automatically after worktree operations
 hooks:
@@ -199,6 +203,11 @@ project_overrides:
           cwd: "{worktree_path}"         # Template expansion NOT YET IMPLEMENTED
 ```
 
+**Worktree Location Modes:**
+
+- **Dedicated mode** (default): All worktrees are stored in a dedicated directory (`~/worktrees` by default). This keeps your worktrees separate from your repository.
+- **Per-repo mode**: Worktrees are stored in `.worktrees/` subdirectory within each repository. This keeps worktrees close to the repository code.
+
 **IMPORTANT LIMITATIONS:**
 
 - **Hook Template Expansion**: The `{worktree_path}` template is NOT yet implemented. When specifying `cwd`, use absolute paths or relative paths from your current directory. This feature is planned for a future release.
@@ -219,7 +228,9 @@ The following configuration sections are documented but NOT implemented in the c
 # Create a new feature branch from main
 wt add feature/new-auth --base main
 
-# The worktree is created at ~/dev/worktrees/feature/new-auth
+# The worktree is created based on your worktree.location config:
+# - Dedicated mode (default): ~/worktrees/feature/new-auth
+# - Per-repo mode: <repo>/.worktrees/feature/new-auth
 # You can now work on the feature in isolation
 ```
 
@@ -231,7 +242,9 @@ wt add bugfix/crash-on-login
 
 # Make your changes, commit them
 # When done, remove the worktree
-wt remove ~/dev/worktrees/bugfix/crash-on-login
+wt remove ~/worktrees/bugfix/crash-on-login
+# Or use branch name in dedicated mode:
+wt remove bugfix/crash-on-login
 ```
 
 ### Testing Multiple Branches
@@ -278,15 +291,18 @@ Now when you run `wt add feature/new`, dependencies are installed and the projec
 wt list
 
 # Remove worktrees you no longer need
-wt remove ~/dev/worktrees/old-feature
+wt remove ~/worktrees/old-feature
+# Or use branch name in dedicated mode:
+wt remove old-feature
 ```
 
 ---
 
 ## Tips and Best Practices
 
-1. **Use descriptive branch names** - Your worktree directory name will match your branch name
-2. **Leverage hooks** - Automate repetitive tasks like dependency installation
-3. **Use dry-run** - Preview changes before making them with `--dry-run`
-4. **Filter your lists** - Use `--branches` or `--path` to quickly find specific worktrees
-5. **Project-specific configs** - Use `.wt.yaml` for per-project hook configurations
+1. **Choose your worktree location mode** - Use `worktree.location: dedicated` to keep worktrees separate, or `worktree.location: per-repo` to keep them within each repository
+2. **Use descriptive branch names** - Your worktree directory name will match your branch name
+3. **Leverage hooks** - Automate repetitive tasks like dependency installation
+4. **Use dry-run** - Preview changes before making them with `--dry-run`
+5. **Filter your lists** - Use `--branches` or `--path` to quickly find specific worktrees
+6. **Project-specific configs** - Use `.wt.yaml` for per-project hook configurations
