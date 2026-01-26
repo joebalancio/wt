@@ -66,5 +66,5 @@ func NewListCmd() *cobra.Command {
 }
 
 func init() {
-	worktreeCmd.AddCommand(NewListCmd())
+	RegisterCommand(NewListCmd())
 }
