@@ -19,7 +19,6 @@ type Config struct {
 
 // GlobalConfig contains global settings
 type GlobalConfig struct {
-	WorktreeRoot      string `yaml:"worktree_root"`
 	TmuxSessionPrefix string `yaml:"tmux_session_prefix"`
 }
 
@@ -73,7 +72,6 @@ type OverrideConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Global: GlobalConfig{
-			WorktreeRoot:      "~/dev/worktrees",
 			TmuxSessionPrefix: "wt-",
 		},
 		Tmux: TmuxConfig{
@@ -105,9 +103,7 @@ func Load(path string) (*Config, error) {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
-	if c.Global.WorktreeRoot == "" {
-		return fmt.Errorf("worktree_root cannot be empty")
-	}
+	// No global validation required currently
 	return nil
 }
 
