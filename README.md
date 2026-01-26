@@ -31,22 +31,24 @@ go install github.com/user/wt@latest
 
 ```bash
 # List worktrees in current repository
-wt worktree list
+wt list
 
 # Add a new worktree for a feature branch
-wt worktree add feature/login
+# Creates worktree at configured location (default: ~/worktrees/<branch>)
+wt add feature/login
 
 # Add a worktree from a specific base branch
-wt worktree add feature/experimental --base main
+wt add feature/experimental --base main
 
-# Remove a worktree
-wt worktree remove /path/to/worktree
+# Remove a worktree by branch name
+wt remove feature/login
 
 # Show help
 wt --help
-wt worktree --help
-wt worktree add --help
+wt add --help
 ```
+
+**Worktree Location**: By default, worktrees are created in `~/worktrees/`. Configure with `worktree.location` and `worktree.dedicated_path` (see [Configuration](#configuration) below).
 
 ## Stacking Features (v2)
 
