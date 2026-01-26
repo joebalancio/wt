@@ -32,72 +32,7 @@ Examples:
   wt stack api          # Creates: currentBranch-api-k9P2`,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx := context.Background()
-			out := cmd.OutOrStdout()
-
-			// Check for main/master protection
-			currentBranch, err := getCurrentBranchProtected(ctx)
-			if err != nil {
-				Fatal("Failed to get current branch: %v", err)
-			}
-
-			if !stackForce && isProtectedBranch(currentBranch) {
-				Fatal("Cannot stack on '%s'. Stack on feature branches only.\nUse --force to override.", currentBranch)
-			}
-
-			// Create clients and service
-			gitClient, err := git.NewClient()
-			if err != nil {
-				Fatal("Failed to create git client: %v", err)
-			}
-
-			spiceClient, err := spice.NewClient()
-			if err != nil {
-				Fatal("Failed to create git-spice client: %v", err)
-			}
-
-			cfg, err := loadConfigForCommand()
-			if err != nil {
-				Fatal("Failed to load config: %v", err)
-			}
-
-			stackService, err := stack.NewService(gitClient, spiceClient, cfg)
-			if err != nil {
-				Fatal("Failed to create stack service: %v", err)
-			}
-
-			// Get the optional name argument
-			var name string
-			if len(args) > 0 {
-				name = args[0]
-			}
-
-			// Create the stack branch
-			spec := stack.StackBranchSpec{
-				Name: name,
-				Base: stackBase,
-			}
-
-			stackBranch, err := stackService.CreateStackBranch(ctx, spec)
-			if err != nil {
-				Fatal("Failed to create stack branch: %v", err)
-			}
-
-			fmt.Fprintf(out, "Created stacked branch: %s\n", stackBranch.Name)
-
-			// Create worktree
-			if !noSetup {
-				worktree, err := stackService.CreateWorktree(ctx, stackBranch.Name)
-				if err != nil {
-					Fatal("Failed to create worktree: %v", err)
-				}
-				fmt.Fprintf(out, "Created worktree: %s\n", worktree.Path)
-
-				// Run setup hooks
-				if err := runSetupHooks(ctx, worktree.Path); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-				}
-			}
+			runStackCommand(cmd, args, stackBase, stackForce, noSetup)
 		},
 	}
 
@@ -106,6 +41,75 @@ Examples:
 	cmd.Flags().BoolVar(&noSetup, "no-setup", false, "skip setup hooks and worktree creation")
 
 	return cmd
+}
+
+func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackForce bool, noSetup bool) {
+	ctx := context.Background()
+	out := cmd.OutOrStdout()
+
+	// Check for main/master protection
+	currentBranch, err := getCurrentBranchProtected(ctx)
+	if err != nil {
+		Fatal("Failed to get current branch: %v", err)
+	}
+
+	if !stackForce && isProtectedBranch(currentBranch) {
+		Fatal("Cannot stack on '%s'. Stack on feature branches only.\nUse --force to override.", currentBranch)
+	}
+
+	// Create clients and service
+	gitClient, err := git.NewClient()
+	if err != nil {
+		Fatal("Failed to create git client: %v", err)
+	}
+
+	spiceClient, err := spice.NewClient()
+	if err != nil {
+		Fatal("Failed to create git-spice client: %v", err)
+	}
+
+	cfg, err := loadConfigForCommand()
+	if err != nil {
+		Fatal("Failed to load config: %v", err)
+	}
+
+	stackService, err := stack.NewService(gitClient, spiceClient, cfg)
+	if err != nil {
+		Fatal("Failed to create stack service: %v", err)
+	}
+
+	// Get the optional name argument
+	var name string
+	if len(args) > 0 {
+		name = args[0]
+	}
+
+	// Create the stack branch
+	spec := stack.BranchSpec{
+		Name: name,
+		Base: stackBase,
+	}
+
+	stackBranch, err := stackService.CreateStackBranch(ctx, spec)
+	if err != nil {
+		Fatal("Failed to create stack branch: %v", err)
+	}
+
+	fmt.Fprintf(out, "Created stacked branch: %s\n", stackBranch.Name)
+
+	// Create worktree
+	if !noSetup {
+		worktree, err := stackService.CreateWorktree(ctx, stackBranch.Name)
+		if err != nil {
+			Fatal("Failed to create worktree: %v", err)
+		}
+		fmt.Fprintf(out, "Created worktree: %s\n", worktree.Path)
+
+		// Run setup hooks
+		if err := runSetupHooks(ctx, worktree.Path); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+	}
 }
 
 // NewStackListCmd creates the stack list subcommand

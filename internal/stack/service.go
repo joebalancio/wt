@@ -65,14 +65,14 @@ func (s *Service) BuildStackBranchName(currentBranch, suffixName string) string 
 	return fmt.Sprintf("%s-%s-%s", currentBranch, suffixName, suffix)
 }
 
-// StackBranchSpec defines parameters for creating a stack branch
-type StackBranchSpec struct {
+// BranchSpec defines parameters for creating a stack branch
+type BranchSpec struct {
 	Name string // Optional named suffix (e.g., "api" for feat/auth-api-xxxx)
 	Base string // Optional base branch (defaults to current)
 }
 
 // CreateStackBranch creates a new stacked branch using git-spice
-func (s *Service) CreateStackBranch(ctx context.Context, spec StackBranchSpec) (*domain.StackBranch, error) {
+func (s *Service) CreateStackBranch(ctx context.Context, spec BranchSpec) (*domain.StackBranch, error) {
 	// Get current branch
 	currentBranch, err := s.git.GetCurrentBranch(ctx)
 	if err != nil {

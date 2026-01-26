@@ -134,7 +134,7 @@ func TestService_CreateStackBranch(t *testing.T) {
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	spec := StackBranchSpec{Name: ""}
+	spec := BranchSpec{Name: ""}
 	branch, err := service.CreateStackBranch(context.Background(), spec)
 	if err != nil {
 		t.Fatalf("CreateStackBranch() error = %v", err)
@@ -164,7 +164,7 @@ func TestService_CreateStackBranch_NamedSuffix(t *testing.T) {
 
 	service, _ := NewService(mockGit, mockSpice, cfg)
 
-	spec := StackBranchSpec{Name: "api"}
+	spec := BranchSpec{Name: "api"}
 	branch, err := service.CreateStackBranch(context.Background(), spec)
 	if err != nil {
 		t.Fatalf("CreateStackBranch() error = %v", err)
@@ -191,7 +191,7 @@ func TestService_CreateStackBranch_WithBase(t *testing.T) {
 	service, _ := NewService(mockGit, mockSpice, cfg)
 
 	// Test with explicit base
-	spec := StackBranchSpec{Name: "fix", Base: "main"}
+	spec := BranchSpec{Name: "fix", Base: "main"}
 	_, err := service.CreateStackBranch(context.Background(), spec)
 	if err != nil {
 		t.Fatalf("CreateStackBranch() error = %v", err)
@@ -218,7 +218,7 @@ func TestService_CreateStackBranch_BaseDefaultsToCurrent(t *testing.T) {
 	service, _ := NewService(mockGit, mockSpice, cfg)
 
 	// Test without base - should default to current branch
-	spec := StackBranchSpec{Name: "fix"}
+	spec := BranchSpec{Name: "fix"}
 	_, err := service.CreateStackBranch(context.Background(), spec)
 	if err != nil {
 		t.Fatalf("CreateStackBranch() error = %v", err)
