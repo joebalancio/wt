@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/joebalancio/wt/internal/config"
 )
 
 // Client wraps git-spice operations
@@ -13,36 +15,28 @@ type Client struct {
 	gsPath string
 }
 
-// NewClient creates a new git-spice client
-func NewClient() (*Client, error) {
-	// Try "git-spice" first (more specific, avoids Ghostscript conflict)
-	// then fall back to "gs" alias if it's actually git-spice
-	path, err := findGitSpice()
-	if err != nil {
-		return nil, err
-	}
-	return &Client{gsPath: path}, nil
-}
-
-// findGitSpice locates the git-spice executable, trying "git-spice" first,
-// then "gs" if it's actually git-spice (not Ghostscript).
-func findGitSpice() (string, error) {
-	// Try "git-spice" first
-	if path, err := exec.LookPath("git-spice"); err == nil {
-		return path, nil
+// NewClient creates a new git-spice client with explicit config
+func NewClient(cfg *config.Config) (*Client, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config cannot be nil")
 	}
 
-	// Try "gs" but verify it's git-spice, not Ghostscript
-	if path, err := exec.LookPath("gs"); err == nil {
-		// Verify by checking version
-		cmd := exec.Command(path, "--version")
-		output, _ := cmd.CombinedOutput()
-		if strings.Contains(string(output), "git-spice") {
-			return path, nil
-		}
+	// No auto-detection at runtime
+	if cfg.Spice.BinaryPath == "" {
+		return nil, fmt.Errorf("git-spice not configured. Run 'wt init' to set up git-spice integration")
 	}
 
-	return "", fmt.Errorf("git-spice not found in PATH (tried git-spice and gs)")
+	// Verify the configured path exists and is executable
+	if _, err := exec.LookPath(cfg.Spice.BinaryPath); err != nil {
+		return nil, fmt.Errorf("git-spice binary not found at %s: %w", cfg.Spice.BinaryPath, err)
+	}
+
+	// Verify it's actually git-spice
+	if err := verifyGitSpice(cfg.Spice.BinaryPath); err != nil {
+		return nil, fmt.Errorf("%s is not git-spice: %w", cfg.Spice.BinaryPath, err)
+	}
+
+	return &Client{gsPath: cfg.Spice.BinaryPath}, nil
 }
 
 // verifyGitSpice checks that the path is actually git-spice
@@ -56,26 +50,6 @@ func verifyGitSpice(path string) error {
 		return fmt.Errorf("version output doesn't contain 'git-spice'")
 	}
 	return nil
-}
-
-// detectGitSpice locates git-spice binary
-// Tries "git-spice" first (most specific), then "gs" with verification
-func detectGitSpice() (string, error) {
-	// Try "git-spice" first
-	if path, err := exec.LookPath("git-spice"); err == nil {
-		if err := verifyGitSpice(path); err == nil {
-			return path, nil
-		}
-	}
-
-	// Try "gs" with verification
-	if path, err := exec.LookPath("gs"); err == nil {
-		if err := verifyGitSpice(path); err == nil {
-			return path, nil
-		}
-	}
-
-	return "", fmt.Errorf("git-spice not found in PATH (tried git-spice and gs)")
 }
 
 // GetVersion returns the git-spice version

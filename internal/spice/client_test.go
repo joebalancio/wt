@@ -3,24 +3,60 @@ package spice
 import (
 	"context"
 	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/joebalancio/wt/internal/config"
 )
 
-func TestNewClient(t *testing.T) {
-	client, err := NewClient()
-	if err != nil {
-		t.Fatalf("NewClient() error = %v", err)
+func TestNewClient_RequiresConfig(t *testing.T) {
+	cfg := &config.Config{
+		Spice: config.SpiceConfig{
+			BinaryPath: "",
+		},
 	}
-	if client == nil {
-		t.Fatal("NewClient() returned nil client")
+
+	_, err := NewClient(cfg)
+	if err == nil {
+		t.Error("expected error when BinaryPath is empty")
+	}
+}
+
+func TestNewClient_ValidatesPath(t *testing.T) {
+	cfg := &config.Config{
+		Spice: config.SpiceConfig{
+			BinaryPath: "/nonexistent/path",
+		},
+	}
+
+	_, err := NewClient(cfg)
+	if err == nil {
+		t.Error("expected error for nonexistent path")
+	}
+}
+
+func TestNewClient_NilConfig(t *testing.T) {
+	_, err := NewClient(nil)
+	if err == nil {
+		t.Error("expected error for nil config")
 	}
 }
 
 func TestClient_GetVersion(t *testing.T) {
-	client, err := NewClient()
+	// Skip if git-spice not available
+	path, err := exec.LookPath("git-spice")
 	if err != nil {
 		t.Skipf("git-spice not available: %v", err)
+	}
+
+	cfg := &config.Config{
+		Spice: config.SpiceConfig{
+			BinaryPath: path,
+		},
+	}
+
+	client, err := NewClient(cfg)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
 	}
 
 	ctx := context.Background()
@@ -35,9 +71,21 @@ func TestClient_GetVersion(t *testing.T) {
 }
 
 func TestClient_CreateBranch(t *testing.T) {
-	client, err := NewClient()
+	// Skip if git-spice not available
+	path, err := exec.LookPath("git-spice")
 	if err != nil {
 		t.Skipf("git-spice not available: %v", err)
+	}
+
+	cfg := &config.Config{
+		Spice: config.SpiceConfig{
+			BinaryPath: path,
+		},
+	}
+
+	client, err := NewClient(cfg)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
 	}
 
 	// TODO: Add integration test for branch creation
@@ -47,7 +95,7 @@ func TestClient_CreateBranch(t *testing.T) {
 
 func TestVerifyGitSpice_ValidBinary(t *testing.T) {
 	// Skip if git-spice not available
-	path, err := findGitSpice()
+	path, err := exec.LookPath("git-spice")
 	if err != nil {
 		t.Skip("git-spice not available")
 	}
@@ -61,21 +109,5 @@ func TestVerifyGitSpice_InvalidBinary(t *testing.T) {
 	err := verifyGitSpice("/bin/ls")
 	if err == nil {
 		t.Error("expected error for /bin/ls, got nil")
-	}
-}
-
-func TestDetectGitSpice_PrefersGitSpiceCommand(t *testing.T) {
-	// This test verifies the precedence: git-spice > gs
-	path, err := detectGitSpice()
-	if err != nil {
-		t.Skip("git-spice not available")
-	}
-
-	// Should not be just "gs" if "git-spice" exists
-	if filepath.Base(path) == "gs" {
-		// Check if git-spice also exists
-		if _, err := exec.LookPath("git-spice"); err == nil {
-			t.Error("prefer 'git-spice' over 'gs', but got 'gs'")
-		}
 	}
 }
