@@ -55,6 +55,15 @@ func (s *Service) List(ctx context.Context, filter *domain.WorktreeFilter) ([]*d
 
 // Add creates a new worktree
 func (s *Service) Add(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+	// Resolve path if not specified
+	if spec.Path == "" {
+		resolvedPath, err := s.ResolvePath(ctx, spec.Branch, "")
+		if err != nil {
+			return nil, err
+		}
+		spec.Path = resolvedPath
+	}
+
 	if err := spec.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid spec: %w", err)
 	}
