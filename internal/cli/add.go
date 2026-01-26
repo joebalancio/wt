@@ -40,7 +40,12 @@ If a branch with the same name already exists, the command will fail.`,
 				Fatal("Failed to create git client: %v", err)
 			}
 
-			svc, err := worktree.NewService(gitClient)
+			cfg, err := loadConfigForCommand()
+			if err != nil {
+				Fatal("Failed to load config: %v", err)
+			}
+
+			svc, err := worktree.NewService(gitClient, cfg)
 			if err != nil {
 				Fatal("Failed to create service: %v", err)
 			}

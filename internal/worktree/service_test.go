@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/user/wt/internal/config"
 	"github.com/user/wt/internal/git"
 	"github.com/user/wt/pkg/domain"
 )
@@ -75,7 +76,8 @@ func TestService_List(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -96,7 +98,8 @@ func TestService_List(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -111,7 +114,7 @@ func TestService_List(t *testing.T) {
 	})
 
 	t.Run("returns error when NewService called with nil", func(t *testing.T) {
-		_, err := NewService(nil)
+		_, err := NewService(nil, config.DefaultConfig())
 
 		if err == nil {
 			t.Fatal("NewService(nil) expected error, got nil")
@@ -131,7 +134,8 @@ func TestService_List(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -161,7 +165,8 @@ func TestService_Add(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -182,7 +187,8 @@ func TestService_Add(t *testing.T) {
 	t.Run("returns error when spec validation fails", func(t *testing.T) {
 		mock := &mockGitClient{}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -206,7 +212,8 @@ func TestService_Add(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -231,7 +238,8 @@ func TestService_Remove(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -245,7 +253,8 @@ func TestService_Remove(t *testing.T) {
 	t.Run("returns error when path is empty", func(t *testing.T) {
 		mock := &mockGitClient{}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}
@@ -266,7 +275,8 @@ func TestService_Remove(t *testing.T) {
 			},
 		}
 
-		svc, err := NewService(mock)
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
 		if err != nil {
 			t.Fatalf("NewService() error = %v", err)
 		}

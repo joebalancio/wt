@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/user/wt/internal/config"
 	"github.com/user/wt/internal/git"
 	"github.com/user/wt/internal/worktree"
 	"github.com/user/wt/pkg/domain"
@@ -200,7 +201,8 @@ func TestIntegration_WorktreeService(t *testing.T) {
 		t.Fatalf("failed to create git client: %v", err)
 	}
 
-	service, err := worktree.NewService(client)
+	cfg := config.DefaultConfig()
+	service, err := worktree.NewService(client, cfg)
 	if err != nil {
 		t.Fatalf("failed to create worktree service: %v", err)
 	}
@@ -624,7 +626,8 @@ func TestIntegration_WorktreeFilter(t *testing.T) {
 		t.Fatalf("failed to create git client: %v", err)
 	}
 
-	service, err := worktree.NewService(client)
+	cfg := config.DefaultConfig()
+	service, err := worktree.NewService(client, cfg)
 	if err != nil {
 		t.Fatalf("failed to create worktree service: %v", err)
 	}
