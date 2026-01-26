@@ -41,3 +41,6 @@ build/
 # Air (hot reload)
 tmp/
 .air.toml.bak
+
+# Git
+.worktrees/
