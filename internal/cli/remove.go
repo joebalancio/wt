@@ -50,6 +50,5 @@ Use --force to remove it anyway.`,
 }
 
 func init() {
-	// Register as a child of worktreeCmd
-	worktreeCmd.AddCommand(NewRemoveCmd())
+	RegisterCommand(NewRemoveCmd())
 }
