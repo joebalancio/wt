@@ -45,6 +45,19 @@ func findGitSpice() (string, error) {
 	return "", fmt.Errorf("git-spice not found in PATH (tried git-spice and gs)")
 }
 
+// verifyGitSpice checks that the path is actually git-spice
+func verifyGitSpice(path string) error {
+	cmd := exec.Command(path, "--version")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to run --version: %w", err)
+	}
+	if !strings.Contains(string(output), "git-spice") {
+		return fmt.Errorf("version output doesn't contain 'git-spice'")
+	}
+	return nil
+}
+
 // GetVersion returns the git-spice version
 func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	var stdout bytes.Buffer

@@ -42,3 +42,22 @@ func TestClient_CreateBranch(t *testing.T) {
 	// This requires a git repo with git-spice initialized
 	_ = client
 }
+
+func TestVerifyGitSpice_ValidBinary(t *testing.T) {
+	// Skip if git-spice not available
+	path, err := findGitSpice()
+	if err != nil {
+		t.Skip("git-spice not available")
+	}
+
+	if err := verifyGitSpice(path); err != nil {
+		t.Errorf("verifyGitSpice failed: %v", err)
+	}
+}
+
+func TestVerifyGitSpice_InvalidBinary(t *testing.T) {
+	err := verifyGitSpice("/bin/ls")
+	if err == nil {
+		t.Error("expected error for /bin/ls, got nil")
+	}
+}
