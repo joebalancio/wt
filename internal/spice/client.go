@@ -58,6 +58,26 @@ func verifyGitSpice(path string) error {
 	return nil
 }
 
+// detectGitSpice locates git-spice binary
+// Tries "git-spice" first (most specific), then "gs" with verification
+func detectGitSpice() (string, error) {
+	// Try "git-spice" first
+	if path, err := exec.LookPath("git-spice"); err == nil {
+		if err := verifyGitSpice(path); err == nil {
+			return path, nil
+		}
+	}
+
+	// Try "gs" with verification
+	if path, err := exec.LookPath("gs"); err == nil {
+		if err := verifyGitSpice(path); err == nil {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("git-spice not found in PATH (tried git-spice and gs)")
+}
+
 // GetVersion returns the git-spice version
 func (c *Client) GetVersion(ctx context.Context) (string, error) {
 	var stdout bytes.Buffer

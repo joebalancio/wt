@@ -2,6 +2,8 @@ package spice
 
 import (
 	"context"
+	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -59,5 +61,21 @@ func TestVerifyGitSpice_InvalidBinary(t *testing.T) {
 	err := verifyGitSpice("/bin/ls")
 	if err == nil {
 		t.Error("expected error for /bin/ls, got nil")
+	}
+}
+
+func TestDetectGitSpice_PrefersGitSpiceCommand(t *testing.T) {
+	// This test verifies the precedence: git-spice > gs
+	path, err := detectGitSpice()
+	if err != nil {
+		t.Skip("git-spice not available")
+	}
+
+	// Should not be just "gs" if "git-spice" exists
+	if filepath.Base(path) == "gs" {
+		// Check if git-spice also exists
+		if _, err := exec.LookPath("git-spice"); err == nil {
+			t.Error("prefer 'git-spice' over 'gs', but got 'gs'")
+		}
 	}
 }
