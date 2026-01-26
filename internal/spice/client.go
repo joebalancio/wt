@@ -15,11 +15,34 @@ type Client struct {
 
 // NewClient creates a new git-spice client
 func NewClient() (*Client, error) {
-	path, err := exec.LookPath("gs")
+	// Try "git-spice" first (more specific, avoids Ghostscript conflict)
+	// then fall back to "gs" alias if it's actually git-spice
+	path, err := findGitSpice()
 	if err != nil {
-		return nil, fmt.Errorf("git-spice (gs) not found in PATH: %w", err)
+		return nil, err
 	}
 	return &Client{gsPath: path}, nil
+}
+
+// findGitSpice locates the git-spice executable, trying "git-spice" first,
+// then "gs" if it's actually git-spice (not Ghostscript).
+func findGitSpice() (string, error) {
+	// Try "git-spice" first
+	if path, err := exec.LookPath("git-spice"); err == nil {
+		return path, nil
+	}
+
+	// Try "gs" but verify it's git-spice, not Ghostscript
+	if path, err := exec.LookPath("gs"); err == nil {
+		// Verify by checking version
+		cmd := exec.Command(path, "--version")
+		output, _ := cmd.CombinedOutput()
+		if strings.Contains(string(output), "git-spice") {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("git-spice not found in PATH (tried git-spice and gs)")
 }
 
 // GetVersion returns the git-spice version

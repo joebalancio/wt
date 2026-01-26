@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -9,6 +10,28 @@ import (
 
 	"github.com/joebalancio/wt/internal/git"
 )
+
+// gitSpiceCommand returns the available git-spice command name.
+// Tries "git-spice" first (more specific, avoids Ghostscript conflict),
+// then falls back to "gs" alias if it's actually git-spice (not Ghostscript).
+func gitSpiceCommand() (string, error) {
+	// Try "git-spice" first
+	if path, err := exec.LookPath("git-spice"); err == nil {
+		return path, nil
+	}
+
+	// Try "gs" but verify it's git-spice, not Ghostscript
+	if path, err := exec.LookPath("gs"); err == nil {
+		// Verify by checking version
+		cmd := exec.Command(path, "--version")
+		output, _ := cmd.CombinedOutput()
+		if strings.Contains(string(output), "git-spice") {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("git-spice not found in PATH (tried git-spice and gs)")
+}
 
 // runCommand executes a command in the specified directory
 func runCommand(t testing.TB, dir string, name string, args ...string) {
@@ -31,8 +54,9 @@ func TestStacking_BasicWorkflow(t *testing.T) {
 	skipIfNoGit(t)
 
 	// Skip if git-spice not available
-	if _, err := exec.LookPath("git-spice"); err != nil {
-		t.Skip("git-spice not available")
+	gsCmd, err := gitSpiceCommand()
+	if err != nil {
+		t.Skipf("git-spice not available: %v", err)
 	}
 
 	if testing.Short() {
@@ -53,13 +77,13 @@ func TestStacking_BasicWorkflow(t *testing.T) {
 	}
 
 	// Initialize git-spice
-	runCommand(t, repoPath, "git-spice", "init")
+	runCommand(t, repoPath, gsCmd, "init")
 
 	// Create root branch via git
 	runCommand(t, repoPath, "git", "checkout", "-b", "feat/test-root")
 
 	// Create a stacked branch using git-spice
-	runCommand(t, repoPath, "git-spice", "branch", "feat/test-stack-child")
+	runCommand(t, repoPath, gsCmd, "branch", "feat/test-stack-child")
 
 	// List worktrees to verify
 	client, err := git.NewClient()
@@ -88,8 +112,9 @@ func TestStacking_BasicWorkflow(t *testing.T) {
 func TestStacking_BranchNaming(t *testing.T) {
 	skipIfNoGit(t)
 
-	if _, err := exec.LookPath("git-spice"); err != nil {
-		t.Skip("git-spice not available")
+	gsCmd, err := gitSpiceCommand()
+	if err != nil {
+		t.Skipf("git-spice not available: %v", err)
 	}
 
 	if testing.Short() {
@@ -108,11 +133,11 @@ func TestStacking_BranchNaming(t *testing.T) {
 		t.Fatalf("failed to change to repo directory: %v", err)
 	}
 
-	runCommand(t, repoPath, "git-spice", "init")
+	runCommand(t, repoPath, gsCmd, "init")
 	runCommand(t, repoPath, "git", "checkout", "-b", "feat/naming-test")
 
 	// Create stacked branch - git-spice will auto-generate suffix
-	runCommand(t, repoPath, "git-spice", "branch", "feat/naming-test-child")
+	runCommand(t, repoPath, gsCmd, "branch", "feat/naming-test-child")
 
 	client, err := git.NewClient()
 	if err != nil {
