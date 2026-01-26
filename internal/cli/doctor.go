@@ -11,10 +11,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/config"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
+	"github.com/spf13/cobra"
 )
 
 // NewDoctorCmd creates the doctor command

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/worktree"
+	"github.com/spf13/cobra"
 )
 
 // NewRemoveCmd creates the remove command

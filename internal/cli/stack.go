@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/joebalancio/wt/internal/config"
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
 	"github.com/joebalancio/wt/internal/stack"
+	"github.com/spf13/cobra"
 )
 
 // NewStackCmd creates the stack command group
