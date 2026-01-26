@@ -68,6 +68,11 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		Fatal("Failed to load config: %v", err)
 	}
 
+	// Validate git-spice configuration early
+	if err := validateGitSpiceConfig(cfg); err != nil {
+		Fatal("%v", err)
+	}
+
 	spiceClient, err := spice.NewClient(cfg)
 	if err != nil {
 		Fatal("Failed to create spice client: %v", err)
@@ -135,6 +140,11 @@ func NewStackListCmd() *cobra.Command {
 				Fatal("Failed to load config: %v", err)
 			}
 
+			// Validate git-spice configuration early
+			if err := validateGitSpiceConfig(cfg); err != nil {
+				Fatal("%v", err)
+			}
+
 			spiceClient, err := spice.NewClient(cfg)
 			if err != nil {
 				Fatal("Failed to create spice client: %v", err)
@@ -187,6 +197,30 @@ func loadConfigForCommand() (*config.Config, error) {
 		return config.DefaultConfig(), nil
 	}
 	return config.Load(configPath)
+}
+
+// validateGitSpiceConfig validates git-spice configuration with auto-detection fallback
+// This is the ONLY place we auto-detect git-spice at runtime
+// Provides clear error messages when git-spice is not available
+func validateGitSpiceConfig(cfg *config.Config) error {
+	// If already configured, nothing to do
+	if cfg.Spice.BinaryPath != "" {
+		return nil
+	}
+
+	// Try to detect git-spice
+	path, err := detectGitSpice()
+	if err != nil {
+		return fmt.Errorf("git-spice not found and not configured.\n\n" +
+			"Install git-spice to use stacking:\n" +
+			"  cargo install git-spice\n" +
+			"  brew install git-spice\n\n" +
+			"Then run: wt init")
+	}
+
+	// Auto-configure detected path
+	cfg.Spice.BinaryPath = path
+	return nil
 }
 
 func init() {
