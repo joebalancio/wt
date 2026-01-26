@@ -30,17 +30,6 @@ func init() {
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default is $HOME/.config/wt/config.yaml or .wt.yaml in project)")
 	rootCmd.PersistentFlags().CountP("verbose", "v", "verbose output (can be used multiple times)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "show what would be done without executing")
-
-	// Make `wt` (no args) equivalent to `wt worktree list`
-	// This uses Cobra's execution pipeline to ensure all hooks run correctly
-	rootCmd.Run = func(cmd *cobra.Command, _ []string) {
-		// Use SetArgs and Execute to properly dispatch through Cobra's pipeline
-		cmd.SetArgs([]string{"worktree", "list"})
-		if err := cmd.Execute(); err != nil {
-			// Execute already prints the error, just exit
-			os.Exit(1)
-		}
-	}
 }
 
 var dryRun bool
