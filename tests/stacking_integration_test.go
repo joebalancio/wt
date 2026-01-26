@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/user/wt/internal/git"
+	"github.com/joebalancio/wt/internal/git"
 )
 
 // runCommand executes a command in the specified directory

@@ -7,7 +7,7 @@ package git
 import (
 	"context"
 
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // GitClient defines the interface for git operations

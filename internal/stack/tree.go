@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // FormatStackTree formats a stack of branches as a tree with paths

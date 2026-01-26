@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/internal/spice"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/spice"
 )
 
 // NewInitCmd creates the init command

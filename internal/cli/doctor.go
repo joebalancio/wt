@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/internal/spice"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/spice"
 )
 
 // NewDoctorCmd creates the doctor command

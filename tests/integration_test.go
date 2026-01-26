@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/internal/worktree"
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/worktree"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // setupTestRepo creates a temporary git repository with an initial commit

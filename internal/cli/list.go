@@ -7,9 +7,9 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/internal/worktree"
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/worktree"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // printWorktrees prints worktrees to the given writer

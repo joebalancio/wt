@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/wt/internal/config"
+	"github.com/joebalancio/wt/internal/config"
 )
 
 // HookRunner executes post-create hooks

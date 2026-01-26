@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/user/wt/internal/config"
+	"github.com/joebalancio/wt/internal/config"
 )
 
 func TestNewHookRunner(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 func TestFormatStackTree(t *testing.T) {

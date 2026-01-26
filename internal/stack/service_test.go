@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/spice"
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/spice"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 func TestNewService(t *testing.T) {

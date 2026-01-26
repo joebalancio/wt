@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // Client wraps git operations

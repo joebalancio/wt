@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/aidarkhanov/nanoid"
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/internal/spice"
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/spice"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // SpiceClient defines the interface for git-spice operations

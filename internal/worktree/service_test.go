@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/pkg/domain"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/pkg/domain"
 )
 
 // Compile-time interface compliance check

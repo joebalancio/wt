@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/user/wt/internal/config"
-	"github.com/user/wt/internal/git"
-	"github.com/user/wt/internal/spice"
-	"github.com/user/wt/internal/stack"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/spice"
+	"github.com/joebalancio/wt/internal/stack"
 )
 
 // NewStackCmd creates the stack command group
