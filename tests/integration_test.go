@@ -314,8 +314,8 @@ func TestIntegration_WorktreeWithBase(t *testing.T) {
 	}
 }
 
-// TestIntegration_WorktreeAutoPath tests creating a worktree with auto-generated path
-func TestIntegration_WorktreeAutoPath(t *testing.T) {
+// TestIntegration_WorktreeWithPath tests creating a worktree with an explicit path
+func TestIntegration_WorktreeWithPath(t *testing.T) {
 	skipIfNoGit(t)
 
 	if testing.Short() {
@@ -343,28 +343,30 @@ func TestIntegration_WorktreeAutoPath(t *testing.T) {
 		t.Fatalf("failed to create git client: %v", err)
 	}
 
-	// Create a worktree without specifying a path (should auto-generate from branch name)
+	// Create a worktree with explicit path
+	// After unification, the git client requires Path to be provided.
+	// Auto-path generation is now handled by the worktree service layer.
 	branchName := "feature/auto-path"
 	expectedPath := filepath.Join(repoPath, branchName)
 
 	spec := domain.WorktreeCreateSpec{
 		Branch: branchName,
-		// Path is empty - should be auto-generated
+		Path:   expectedPath,
 	}
 
 	worktree, err := client.AddWorktree(ctx, spec)
 	if err != nil {
-		t.Fatalf("failed to add worktree with auto path: %v", err)
+		t.Fatalf("failed to add worktree with path: %v", err)
 	}
 
-	// Verify the path was auto-generated correctly
+	// Verify the path is set correctly
 	if worktree.Path != expectedPath {
-		t.Errorf("expected auto-generated path %s, got %s", expectedPath, worktree.Path)
+		t.Errorf("expected path %s, got %s", expectedPath, worktree.Path)
 	}
 
 	// Verify the directory actually exists
 	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Errorf("auto-generated path directory does not exist: %s", expectedPath)
+		t.Errorf("worktree path directory does not exist: %s", expectedPath)
 	}
 
 	// Cleanup
