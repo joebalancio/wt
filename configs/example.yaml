@@ -2,9 +2,6 @@
 # Copy to ~/.config/wt/config.yaml or .wt.yaml in your project
 
 global:
-  # Base directory for worktrees (supports ~ expansion)
-  worktree_root: ~/dev/worktrees
-
   # Prefix for tmux session names
   tmux_session_prefix: "wt-"
 
