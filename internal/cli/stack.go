@@ -63,14 +63,14 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		Fatal("Failed to create git client: %v", err)
 	}
 
-	spiceClient, err := spice.NewClient()
-	if err != nil {
-		Fatal("Failed to create git-spice client: %v", err)
-	}
-
 	cfg, err := loadConfigForCommand()
 	if err != nil {
 		Fatal("Failed to load config: %v", err)
+	}
+
+	spiceClient, err := spice.NewClient(cfg)
+	if err != nil {
+		Fatal("Failed to create spice client: %v", err)
 	}
 
 	stackService, err := stack.NewService(gitClient, spiceClient, cfg)
@@ -129,15 +129,15 @@ func NewStackListCmd() *cobra.Command {
 				Fatal("Failed to create git client: %v", err)
 			}
 
-			spiceClient, err := spice.NewClient()
-			if err != nil {
-				Fatal("Failed to create git-spice client: %v", err)
-			}
-
 			// Load config
 			cfg, err := loadConfigForCommand()
 			if err != nil {
 				Fatal("Failed to load config: %v", err)
+			}
+
+			spiceClient, err := spice.NewClient(cfg)
+			if err != nil {
+				Fatal("Failed to create spice client: %v", err)
 			}
 
 			// Create stack service
