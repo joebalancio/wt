@@ -1,7 +1,6 @@
 # Binaries
 bin/
 tmp/
-wt
 *.exe
 *.exe~
 *.dll
