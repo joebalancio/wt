@@ -97,11 +97,6 @@ func createConfigFile(out io.Writer) error {
 		return nil
 	}
 
-	// Create config directory
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return fmt.Errorf("creating config directory: %w", err)
-	}
-
 	// Create default config
 	cfg := config.DefaultConfig()
 
@@ -110,7 +105,12 @@ func createConfigFile(out io.Writer) error {
 		return fmt.Errorf("validating config: %w", err)
 	}
 
-	fmt.Fprintf(out, "✓ Config validated (config file will be created on first use)\n")
+	// Write config file
+	if err := cfg.Save(configPath); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	fmt.Fprintf(out, "✓ Config created: %s\n", configPath)
 	return nil
 }
 

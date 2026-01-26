@@ -111,6 +111,25 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// Save writes the configuration to a file
+func (c *Config) Save(path string) error {
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	return nil
+}
+
 // FindConfig looks for a config file in standard locations
 func FindConfig(customPath string) (string, error) {
 	if customPath != "" {
