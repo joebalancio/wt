@@ -199,27 +199,16 @@ func loadConfigForCommand() (*config.Config, error) {
 	return config.Load(configPath)
 }
 
-// validateGitSpiceConfig validates git-spice configuration with auto-detection fallback
-// This is the ONLY place we auto-detect git-spice at runtime
-// Provides clear error messages when git-spice is not available
+// validateGitSpiceConfig validates git-spice configuration
+// Returns an error if git-spice is not configured
 func validateGitSpiceConfig(cfg *config.Config) error {
-	// If already configured, nothing to do
-	if cfg.Spice.BinaryPath != "" {
-		return nil
-	}
-
-	// Try to detect git-spice
-	path, err := detectGitSpice()
-	if err != nil {
-		return fmt.Errorf("git-spice not found and not configured.\n\n" +
-			"Install git-spice to use stacking:\n" +
+	if cfg.Spice.BinaryPath == "" {
+		return fmt.Errorf("git-spice not configured.\n\n" +
+			"Run 'wt init' to configure git-spice.\n\n" +
+			"Install git-spice first if needed:\n" +
 			"  cargo install git-spice\n" +
-			"  brew install git-spice\n\n" +
-			"Then run: wt init")
+			"  brew install git-spice")
 	}
-
-	// Auto-configure detected path
-	cfg.Spice.BinaryPath = path
 	return nil
 }
 
