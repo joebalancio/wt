@@ -61,7 +61,9 @@ cmd/wt/main.go          # Entry point - calls cli.Execute()
 internal/
 ├── cli/               # Cobra commands (user-facing layer)
 │   ├── root.go        # Global flags, command registration
-│   ├── worktree.go    # Worktree subcommands
+│   ├── add.go         # Add worktree command
+│   ├── list.go        # List worktrees command
+│   ├── remove.go      # Remove worktree command
 │   ├── session.go     # Session subcommands
 │   ├── config.go      # Config subcommands
 │   ├── stack.go       # Stack command (branch stacking)
