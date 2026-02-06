@@ -113,6 +113,38 @@ worktree:
 
 Run `wt doctor` to verify installation and dependencies.
 
+
+## Tmux Integration
+
+WT automatically creates tmux windows when you create worktrees while inside a tmux session.
+
+### Features
+
+- **Automatic window creation**: `wt add feat/auth` creates a new tmux window
+- **Smart naming**: Branch names are abbreviated for readable window names
+- **Stack support**: Stacked branches get numbered suffixes (feat/auth/1, feat/auth/2)
+- **Automatic cleanup**: Windows are closed when removing worktrees
+
+### Window Naming
+
+| Branch | Window Name |
+|--------|-------------|
+| `feat/auth` | `feat/auth` |
+| `feature/nova-123` | `nova-123` |
+| `feature/api-fix` | `feat/a-f` |
+| `feat/auth-xY7k` (stack level 1) | `feat/auth/1` |
+
+### Disabling Tmux Integration
+
+To skip window creation for a single command:
+
+```bash
+wt add feat/auth --no-tmux
+wt stack --no-tmux
+```
+
+See [Tmux Windows Documentation](docs/tmux-windows.md) for details.
+
 ## Documentation
 
 See [docs/usage.md](docs/usage.md) for detailed usage examples and command reference.

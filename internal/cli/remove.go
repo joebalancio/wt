@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -46,6 +47,28 @@ Use --force to remove it anyway.`,
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Removed worktree: %s\n", path)
+			// Close tmux window if in tmux and window matches
+			if isInTmux() {
+				tmuxClient, err := tmux.NewClient()
+				if err == nil {
+					// Try to determine branch name from path
+					// Get the branch name from git worktree list
+					worktrees, _ := gitClient.ListWorktrees(ctx)
+					var branchName string
+					for _, wt := range worktrees {
+						if wt.Path == path {
+							branchName = wt.Branch
+							break
+						}
+					}
+
+					if branchName != "" {
+						windowName := tmux.GenerateWindowName(branchName)
+						// Kill the window if it exists
+						_ = tmuxClient.KillWindow(windowName)
+					}
+				}
+			}
 		},
 	}
 

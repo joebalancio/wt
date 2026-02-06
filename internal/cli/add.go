@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
 	"github.com/joebalancio/wt/pkg/executor"
@@ -72,6 +73,16 @@ If a branch with the same name already exists, the command will fail.`,
 			// Run setup hooks
 			if err := runSetupHooks(ctx, worktree.Path); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+			}
+			// Create tmux window if in tmux and not disabled
+			if shouldCreateTmuxWindow(NoTmux()) {
+				tmuxClient, err := tmux.NewClient()
+				if err == nil {
+					windowName := tmux.GenerateWindowName(worktree.Branch)
+					if err := tmuxClient.CreateOrSelectWindow(windowName, worktree.Path); err != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+					}
+				}
 			}
 		},
 	}

@@ -136,3 +136,15 @@ func parseStackOutput(output string) []*Branch {
 
 	return branches
 }
+
+// GetStackLevel returns the stack level (depth) of a branch in the stack
+// Root branches (like main) return 0, first stacked branch returns 1, etc.
+func (c *Client) GetStackLevel(stack []*Branch, branchName string) (int, error) {
+	for i, b := range stack {
+		if b.Name == branchName {
+			// Stack level is the index (0 for root/main, 1 for first stacked, etc.)
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("branch %q not found in stack", branchName)
+}

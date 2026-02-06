@@ -8,6 +8,7 @@ import (
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
 	"github.com/joebalancio/wt/internal/stack"
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -113,6 +114,26 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		// Run setup hooks
 		if err := runSetupHooks(ctx, worktree.Path); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+		// Create tmux window if in tmux and not disabled
+		if shouldCreateTmuxWindow(NoTmux()) {
+			tmuxClient, err := tmux.NewClient()
+			if err == nil {
+				// Get stack level for window naming
+				stackBranches, _ := stackService.GetStack(ctx)
+				stackLevel := 0
+				for i, sb := range stackBranches {
+					if sb.Name == stackBranch.Name {
+						stackLevel = i
+						break
+					}
+				}
+
+				windowName := tmux.GenerateStackWindowName(stackBranch.Name, stackLevel)
+				if err := tmuxClient.CreateOrSelectWindow(windowName, worktree.Path); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+				}
+			}
 		}
 	}
 }

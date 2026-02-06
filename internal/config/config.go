@@ -39,9 +39,16 @@ type Hook struct {
 
 // TmuxConfig contains tmux-specific settings
 type TmuxConfig struct {
-	Layout         string `yaml:"layout,omitempty"`
-	WindowName     string `yaml:"window_name,omitempty"`
-	AttachOnCreate bool   `yaml:"attach_on_create,omitempty"`
+	Layout         string                 `yaml:"layout,omitempty"`
+	WindowName     string                 `yaml:"window_name,omitempty"`
+	AttachOnCreate bool                   `yaml:"attach_on_create,omitempty"`
+	WindowNaming   TmuxWindowNamingConfig `yaml:"window_naming,omitempty"`
+}
+
+// TmuxWindowNamingConfig contains window naming configuration
+type TmuxWindowNamingConfig struct {
+	MaxLength         int  `yaml:"max_length,omitempty"`
+	AbbreviateIssueID bool `yaml:"abbreviate_issue_id,omitempty"`
 }
 
 // WorktreeConfig contains worktree-specific settings
@@ -84,6 +91,10 @@ func DefaultConfig() *Config {
 			Layout:         "main-vertical",
 			WindowName:     "work",
 			AttachOnCreate: true,
+			WindowNaming: TmuxWindowNamingConfig{
+				MaxLength:         16,
+				AbbreviateIssueID: true,
+			},
 		},
 		Worktree: WorktreeConfig{
 			Location:      "dedicated",

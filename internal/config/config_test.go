@@ -60,3 +60,14 @@ func TestSpiceConfig_DefaultValues(t *testing.T) {
 		t.Errorf("expected empty BinaryPath, got %q", cfg.Spice.BinaryPath)
 	}
 }
+
+func TestTmuxWindowNamingConfig_DefaultValues(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.Tmux.WindowNaming.MaxLength != 16 {
+		t.Errorf("expected MaxLength = 16, got %d", cfg.Tmux.WindowNaming.MaxLength)
+	}
+	if cfg.Tmux.WindowNaming.AbbreviateIssueID != true {
+		t.Errorf("expected AbbreviateIssueID = true, got %v", cfg.Tmux.WindowNaming.AbbreviateIssueID)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -29,12 +30,35 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default is $HOME/.config/wt/config.yaml or .wt.yaml in project)")
 	rootCmd.PersistentFlags().CountP("verbose", "v", "verbose output (can be used multiple times)")
+	rootCmd.PersistentFlags().Bool("no-tmux", false, "skip tmux window creation")
 }
 
 // Verbose returns the verbosity level
 func Verbose() int {
 	v, _ := rootCmd.PersistentFlags().GetCount("verbose")
 	return v
+}
+
+// NoTmux returns the value of the --no-tmux flag
+func NoTmux() bool {
+	noTmux, _ := rootCmd.PersistentFlags().GetBool("no-tmux")
+	return noTmux
+}
+
+// isInTmux checks if currently running in tmux
+func isInTmux() bool {
+	return tmux.IsInTmux()
+}
+
+// shouldCreateTmuxWindow determines if tmux window should be created
+func shouldCreateTmuxWindow(noTmuxFlag bool) bool {
+	if !isInTmux() {
+		return false
+	}
+	if noTmuxFlag {
+		return false
+	}
+	return true
 }
 
 // Fatal prints an error and exits with code 1

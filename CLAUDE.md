@@ -213,3 +213,25 @@ The stack service integrates with:
 - Git-spice for branch stack management
 - Config service for worktree path resolution
 - Hook runner for post-create automation
+
+### Tmux Window Integration (v2)
+
+WT v2 adds automatic tmux window management:
+
+- `internal/tmux/session.go` - Extended with window operations (CreateNewWindow, SelectWindow, KillWindow, CreateOrSelectWindow)
+- `internal/tmux/window_naming_test.go` - Window naming logic tests
+- `internal/tmux/window_test.go` - Window operation tests
+- Smart naming: issue ID extraction, prefix/suffix abbreviation, stack numbering
+- Integration points: `wt add`, `wt stack` create windows; `wt remove` cleans up
+- Global `--no-tmux` flag to disable window creation per command
+
+Window naming algorithm:
+1. Extract issue IDs: `feature/nova-123` -> `nova-123`
+2. Abbreviate prefixes: `bugfix` -> `fix`, `refactor` -> `ref`
+3. Abbreviate suffixes: `auth-provider` -> `auth-p`
+4. Truncate to 16 characters max
+5. Stack numbering: root branch has no suffix, level 1 adds `/1`, level 2 adds `/2`
+
+The tmux client integrates with:
+- CLI commands (add, stack, remove) for automatic window management
+- Config service for window naming preferences (MaxLength, AbbreviateIssueID)
