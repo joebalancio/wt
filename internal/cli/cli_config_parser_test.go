@@ -1,0 +1,381 @@
+package cli
+
+import (
+	"testing"
+
+	"github.com/joebalancio/wt/internal/config"
+)
+
+func TestGetValue(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	tests := []struct {
+		name      string
+		key       string
+		expected  string
+		wantError bool
+	}{
+		{"worktree location", "worktree.location", "dedicated", false},
+		{"worktree dedicated_path", "worktree.dedicated_path", "~/worktrees", false},
+		{"tmux attach_on_create", "tmux.attach_on_create", "true", false},
+		{"tmux layout", "tmux.layout", "main-vertical", false},
+		{"tmux window_name", "tmux.window_name", "work", false},
+		{"global tmux_session_prefix", "global.tmux_session_prefix", "wt-", false},
+		{"invalid key format", "invalid", "", true},
+		{"unsupported key", "hooks.on_worktree_create", "", true},
+		{"unknown section", "unknown.field", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value, err := GetValue(cfg, tt.key)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("GetValue() expected error for %q, got nil", tt.key)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("GetValue() unexpected error: %v", err)
+			}
+			if formatValue(value) != tt.expected {
+				t.Errorf("GetValue() = %q, want %q", formatValue(value), tt.expected)
+			}
+		})
+	}
+}
+
+func TestSetValue(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		value     string
+		wantError bool
+	}{
+		{"valid string", "worktree.dedicated_path", "/tmp/wt", false},
+		{"valid bool true", "tmux.attach_on_create", "true", false},
+		{"valid bool false", "tmux.attach_on_create", "false", false},
+		{"valid bool 1", "tmux.attach_on_create", "1", false},
+		{"valid bool 0", "tmux.attach_on_create", "0", false},
+		{"valid bool yes", "tmux.attach_on_create", "yes", false},
+		{"valid bool no", "tmux.attach_on_create", "no", false},
+		{"valid enum dedicated", "worktree.location", "dedicated", false},
+		{"valid enum per-repo", "worktree.location", "per-repo", false},
+		{"invalid enum", "worktree.location", "invalid", true},
+		{"invalid bool", "tmux.attach_on_create", "maybe", true},
+		{"unsupported key", "hooks.on_worktree_create", "echo hi", true},
+		{"invalid key format", "invalid", "value", true},
+		{"global prefix", "global.tmux_session_prefix", "test-", false},
+		{"tmux layout", "tmux.layout", "tiled", false},
+		{"tmux window_name", "tmux.window_name", "editor", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			err := SetValue(cfg, tt.key, tt.value)
+			if (err != nil) != tt.wantError {
+				t.Errorf("SetValue() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestUnsetValue(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		wantError bool
+		validate  func(*config.Config) // Check the value was reverted to default
+	}{
+		{
+			name:      "unset worktree location",
+			key:       "worktree.location",
+			wantError: false,
+			validate: func(cfg *config.Config) {
+				if cfg.Worktree.Location != "dedicated" {
+					t.Errorf("expected default 'dedicated', got %q", cfg.Worktree.Location)
+				}
+			},
+		},
+		{
+			name:      "unset worktree dedicated_path",
+			key:       "worktree.dedicated_path",
+			wantError: false,
+			validate: func(cfg *config.Config) {
+				if cfg.Worktree.DedicatedPath != "" {
+					t.Errorf("expected empty string, got %q", cfg.Worktree.DedicatedPath)
+				}
+			},
+		},
+		{
+			name:      "unset tmux attach_on_create",
+			key:       "tmux.attach_on_create",
+			wantError: false,
+			validate: func(cfg *config.Config) {
+				if cfg.Tmux.AttachOnCreate != true {
+					t.Errorf("expected default true, got %v", cfg.Tmux.AttachOnCreate)
+				}
+			},
+		},
+		{
+			name:      "unset tmux layout",
+			key:       "tmux.layout",
+			wantError: false,
+			validate: func(cfg *config.Config) {
+				if cfg.Tmux.Layout != "main-vertical" {
+					t.Errorf("expected default 'main-vertical', got %q", cfg.Tmux.Layout)
+				}
+			},
+		},
+		{
+			name:      "unset tmux window_name",
+			key:       "tmux.window_name",
+			wantError: false,
+			validate: func(cfg *config.Config) {
+				if cfg.Tmux.WindowName != "work" {
+					t.Errorf("expected default 'work', got %q", cfg.Tmux.WindowName)
+				}
+			},
+		},
+		{
+			name:      "unset global tmux_session_prefix",
+			key:       "global.tmux_session_prefix",
+			wantError: false,
+			validate: func(cfg *config.Config) {
+				if cfg.Global.TmuxSessionPrefix != "wt-" {
+					t.Errorf("expected default 'wt-', got %q", cfg.Global.TmuxSessionPrefix)
+				}
+			},
+		},
+		{
+			name:      "unsupported key",
+			key:       "hooks.on_worktree_create",
+			wantError: true,
+			validate:  nil,
+		},
+		{
+			name:      "invalid key format",
+			key:       "invalid",
+			wantError: true,
+			validate:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			// First set a non-default value
+			_ = SetValue(cfg, tt.key, "non-default")
+
+			err := UnsetValue(cfg, tt.key)
+			if (err != nil) != tt.wantError {
+				t.Errorf("UnsetValue() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+			if !tt.wantError && tt.validate != nil {
+				tt.validate(cfg)
+			}
+		})
+	}
+}
+
+func TestFormatValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  string
+	}{
+		{"boolean true", true, "true"},
+		{"boolean false", false, "false"},
+		{"string", "hello", "hello"},
+		{"empty string", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatValue(tt.input); got != tt.want {
+				t.Errorf("formatValue() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseBool(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		want      bool
+		wantError bool
+	}{
+		{"true lowercase", "true", true, false},
+		{"true uppercase", "TRUE", true, false},
+		{"true mixed case", "True", true, false},
+		{"1", "1", true, false},
+		{"yes", "yes", true, false},
+		{"yes uppercase", "YES", true, false},
+		{"on", "on", true, false},
+		{"false lowercase", "false", false, false},
+		{"false uppercase", "FALSE", false, false},
+		{"0", "0", false, false},
+		{"no", "no", false, false},
+		{"off", "off", false, false},
+		{"invalid", "maybe", false, true},
+		{"empty", "", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseBool(tt.input)
+			if (err != nil) != tt.wantError {
+				t.Errorf("parseBool() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+			if !tt.wantError && got != tt.want {
+				t.Errorf("parseBool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetValueWindowNaming(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	tests := []struct {
+		name      string
+		key       string
+		expected  string
+		wantError bool
+	}{
+		{"window_naming max_length", "tmux.window_naming.max_length", "16", false},
+		{"window_naming abbreviate_issue_id", "tmux.window_naming.abbreviate_issue_id", "true", false},
+		{"unknown window_naming field", "tmux.window_naming.unknown", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value, err := GetValue(cfg, tt.key)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("GetValue() expected error for %q, got nil", tt.key)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("GetValue() unexpected error: %v", err)
+			}
+			if formatValue(value) != tt.expected {
+				t.Errorf("GetValue() = %q, want %q", formatValue(value), tt.expected)
+			}
+		})
+	}
+}
+
+func TestSetValueWindowNaming(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		value     string
+		wantError bool
+	}{
+		{"valid max_length", "tmux.window_naming.max_length", "20", false},
+		{"valid abbreviate_issue_id true", "tmux.window_naming.abbreviate_issue_id", "true", false},
+		{"valid abbreviate_issue_id false", "tmux.window_naming.abbreviate_issue_id", "false", false},
+		{"invalid max_length non-numeric", "tmux.window_naming.max_length", "abc", true},
+		{"invalid max_length too small", "tmux.window_naming.max_length", "0", true},
+		{"invalid max_length too large", "tmux.window_naming.max_length", "100", true},
+		{"invalid abbreviate_issue_id", "tmux.window_naming.abbreviate_issue_id", "maybe", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			err := SetValue(cfg, tt.key, tt.value)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("SetValue() expected error for %q=%q, got nil", tt.key, tt.value)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("SetValue() unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestUnsetValueWindowNaming(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		expected interface{}
+	}{
+		{"unset max_length", "tmux.window_naming.max_length", 16},
+		{"unset abbreviate_issue_id", "tmux.window_naming.abbreviate_issue_id", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			// First set a different value
+			if tt.key == "tmux.window_naming.max_length" {
+				cfg.Tmux.WindowNaming.MaxLength = 24
+			} else {
+				cfg.Tmux.WindowNaming.AbbreviateIssueID = false
+			}
+
+			err := UnsetValue(cfg, tt.key)
+			if err != nil {
+				t.Fatalf("UnsetValue() unexpected error: %v", err)
+			}
+
+			// Verify the value was reset to default
+			var actual interface{}
+			if tt.key == "tmux.window_naming.max_length" {
+				actual = cfg.Tmux.WindowNaming.MaxLength
+			} else {
+				actual = cfg.Tmux.WindowNaming.AbbreviateIssueID
+			}
+
+			if actual != tt.expected {
+				t.Errorf("UnsetValue() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseInt(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		min       int
+		max       int
+		expected  int
+		wantError bool
+	}{
+		{"valid in range", "10", 1, 32, 10, false},
+		{"valid at min", "1", 1, 32, 1, false},
+		{"valid at max", "32", 1, 32, 32, false},
+		{"invalid non-numeric", "abc", 1, 32, 0, true},
+		{"invalid too small", "0", 1, 32, 0, true},
+		{"invalid too large", "33", 1, 32, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseInt(tt.input, tt.min, tt.max)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("parseInt() expected error for %q, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseInt() unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("parseInt() = %d, want %d", result, tt.expected)
+			}
+		})
+	}
+}

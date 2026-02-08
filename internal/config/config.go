@@ -127,6 +127,18 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// ValidateSchema checks if configuration values conform to schema constraints
+func (c *Config) ValidateSchema() error {
+	// Validate worktree.location enum
+	if c.Worktree.Location != "" &&
+		c.Worktree.Location != "dedicated" &&
+		c.Worktree.Location != "per-repo" {
+		return fmt.Errorf("invalid worktree.location: %q (must be 'dedicated' or 'per-repo')",
+			c.Worktree.Location)
+	}
+	return nil
+}
+
 // Save writes the configuration to a file
 func (c *Config) Save(path string) error {
 	// Ensure directory exists

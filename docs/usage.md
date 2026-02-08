@@ -218,6 +218,101 @@ The following configuration sections are documented but NOT implemented in the c
 - `global.tmux_session_prefix` - Tmux integration is planned for a future release
 - `tmux.*` section - All tmux configuration and session management is not yet available
 
+
+### wt config
+
+Programmatic configuration management for wt.
+
+**Synopsis:**
+
+```bash
+wt config <command> [arguments]
+```
+
+**Subcommands:**
+
+| Command | Description |
+|---------|-------------|
+| `get <key>` | Get a config value |
+| `list` | List all config values |
+| `set <key> <value>` | Set a config value (global config only) |
+| `unset <key>` | Remove a config key (global config only) |
+| `validate` | Validate config (YAML + schema) |
+
+**Supported Keys:**
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `global.tmux_session_prefix` | string | `wt-` | Prefix for tmux session names |
+| `worktree.location` | string | `dedicated` | Worktree location mode (`dedicated` or `per-repo`) |
+| `worktree.dedicated_path` | string | `~/worktrees` | Path for dedicated mode worktrees |
+| `tmux.layout` | string | `main-vertical` | Default tmux layout |
+| `tmux.window_name` | string | `work` | Default tmux window name |
+| `tmux.attach_on_create` | bool | `true` | Attach to tmux session on worktree creation |
+| `tmux.window_naming.max_length` | int | `16` | Maximum length for tmux window names |
+| `tmux.window_naming.abbreviate_issue_id` | bool | `true` | Abbreviate issue IDs in window names |
+
+**Examples:**
+
+```bash
+# Get a config value
+wt config get worktree.location
+# Output: dedicated
+
+# Set a value
+wt config set worktree.location per-repo
+# Output: ✓ Updated worktree.location: per-repo in ~/.config/wt/config.yaml
+
+# Validate config
+wt config validate
+# Output: ✓ Config is valid: ~/.config/wt/config.yaml
+#         ✓ YAML syntax valid
+#         ✓ Schema validation passed
+
+# List all config values
+wt config list
+# Output: (full YAML config)
+
+# Remove a key (reverts to default)
+wt config unset worktree.dedicated_path
+# Output: ✓ Removed worktree.dedicated_path from ~/.config/wt/config.yaml
+```
+
+**Boolean Values:**
+
+When setting boolean values, the following inputs are accepted:
+- `true`: `true`, `1`, `yes`, `on` (case-insensitive)
+- `false`: `false`, `0`, `no`, `off` (case-insensitive)
+
+```bash
+wt config set tmux.attach_on_create false
+wt config set tmux.attach_on_create yes   # Sets to true
+```
+
+**Error Handling:**
+
+```bash
+# Invalid enum value
+wt config set worktree.location invalid
+# Error: invalid value "invalid" for worktree.location
+#        Valid values: dedicated, per-repo
+
+# Invalid boolean
+wt config set tmux.attach_on_create maybe
+# Error: invalid boolean value: "maybe" (use: true, false, 1, 0, yes, no)
+
+# Unsupported key
+wt config set hooks.on_worktree_create "echo hi"
+# Error: key "hooks.on_worktree_create" not supported for CLI manipulation
+#        Edit config file directly to modify hooks or project_overrides
+```
+
+**Notes:**
+- `set` and `unset` commands always modify the global config (`~/.config/wt/config.yaml`)
+- For hooks and project_overrides, edit the config file directly
+- `get` and `list` respect the config discovery order (flag → local → global)
+
+---
 ---
 
 ## Common Workflows

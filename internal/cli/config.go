@@ -11,5 +11,14 @@ var configCmd = &cobra.Command{
 }
 
 func init() {
+	// Register subcommands
+	configCmd.AddCommand(
+		NewConfigGetCmd(),
+		NewConfigListCmd(),
+		NewConfigSetCmd(),
+		NewConfigUnsetCmd(),
+		NewConfigValidateCmd(),
+	)
+
 	RegisterCommand(configCmd)
 }

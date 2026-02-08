@@ -33,6 +33,50 @@ make clean                 # Remove build artifacts
 make install               # Install to GOPATH/bin
 ```
 
+
+### wt config command
+
+Programmatic configuration management for wt.
+
+```bash
+# Get a config value
+wt config get worktree.location
+
+# Set a config value (global config only)
+wt config set worktree.location per-repo
+
+# Unset/remove a config key (reverts to default)
+wt config unset tmux.attach_on_create
+
+# List all config values as YAML
+wt config list
+
+# Validate config (YAML syntax + schema validation)
+wt config validate
+```
+
+**Supported keys:**
+- `global.tmux_session_prefix` - Tmux session prefix
+- `worktree.location` - Worktree location mode (dedicated/per-repo)
+- `worktree.dedicated_path` - Path for dedicated mode
+- `tmux.layout` - Default tmux layout
+- `tmux.window_name` - Default tmux window name
+- `tmux.attach_on_create` - Attach to tmux on worktree creation (boolean)
+- `tmux.window_naming.max_length` - Maximum length for tmux window names (integer, 1-32)
+- `tmux.window_naming.abbreviate_issue_id` - Abbreviate issue IDs in window names (boolean)
+
+**Boolean values accepted:** `true`, `false`, `1`, `0`, `yes`, `no` (case-insensitive)
+
+**Implementation files:**
+- `internal/cli/cli_config_parser.go` - Dot-notation parser
+- `internal/cli/cli_config_get.go` - Get command
+- `internal/cli/cli_config_list.go` - List command
+- `internal/cli/cli_config_set.go` - Set command
+- `internal/cli/cli_config_unset.go` - Unset command
+- `internal/cli/cli_config_validate.go` - Validate command
+- `internal/config/config.go:ValidateSchema()` - Schema validation
+
+
 ## Architecture Overview
 
 wt is a CLI tool that orchestrates three external tools: git, tmux, and user-defined hook commands. The architecture is organized around **client wrappers** for external tools and a **configuration-driven hook system**.
