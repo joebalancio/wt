@@ -2,6 +2,8 @@ package tmux
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -141,6 +143,13 @@ func extractIssueID(branch string) string {
 	return ""
 }
 
+// hashBranch generates a deterministic 4-character hex hash from a branch name
+// This provides collision resistance for tmux window names
+func hashBranch(branch string) string {
+	hash := sha256.Sum256([]byte(branch))
+	return hex.EncodeToString(hash[:])[:4]
+}
+
 // truncate truncates a string to max length
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -204,10 +213,15 @@ func abbreviateSuffix(suffix string) string {
 }
 
 // GenerateWindowName generates a tmux window name from a branch name
+// The name includes a 4-char hash suffix for collision resistance
 func GenerateWindowName(branch string) string {
+	// Generate hash suffix first (always needed)
+	hashSuffix := "-" + hashBranch(branch)
+
 	// 1. Try issue ID extraction: feature/nova-123 → nova-123
 	if issue := extractIssueID(branch); issue != "" {
-		return truncate(issue, 16)
+		// Truncate to leave room for hash suffix
+		return truncate(issue, 11) + hashSuffix
 	}
 
 	// 2. Parse branch components
@@ -306,7 +320,7 @@ func GenerateWindowName(branch string) string {
 		}
 	}
 
-	// 4. Combine and truncate
+	// 4. Combine and truncate to leave room for hash suffix (5 chars: -XXXX)
 	var result string
 	if prefix != "" {
 		result = fmt.Sprintf("%s/%s", prefix, abbreviated)
@@ -314,7 +328,7 @@ func GenerateWindowName(branch string) string {
 		result = abbreviated
 	}
 
-	return truncate(result, 16)
+	return truncate(result, 11) + hashSuffix
 }
 
 // getStackRoot returns the root branch name by stripping nanoid suffixes

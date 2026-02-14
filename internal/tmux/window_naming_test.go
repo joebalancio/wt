@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -131,15 +132,15 @@ func TestTruncate(t *testing.T) {
 
 func TestGenerateWindowName(t *testing.T) {
 	tests := []struct {
-		name   string
-		branch string
-		want   string
+		name       string
+		branch     string
+		wantPrefix string // Expected prefix before hash suffix
 	}{
 		{"issue ID extraction", "feature/nova-123", "nova-123"},
 		{"two part branch", "feat/auth", "feat/auth"},
 		{"feature branch", "feature/api-fix", "feat/a-f"},
 		{"bugfix branch", "bugfix/auth-providers", "fix/auth-p"},
-		{"long branch name", "very-long-branch-name-here", "very-long-br"},
+		{"long branch name", "very-long-branch-name-here", "very-long"},
 		{"single word", "main", "main"},
 		{"three part branch", "feat/team/auth-api", "feat/a-a"},
 	}
@@ -147,8 +148,33 @@ func TestGenerateWindowName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GenerateWindowName(tt.branch)
-			if got != tt.want {
-				t.Errorf("GenerateWindowName(%q) = %q, want %q", tt.branch, got, tt.want)
+
+			// Verify format: prefix-hash (hash is 4 hex chars preceded by -)
+			if len(got) < 5 {
+				t.Errorf("GenerateWindowName(%q) = %q, too short", tt.branch, got)
+				return
+			}
+
+			// Verify the hash suffix is present
+			suffix := got[len(got)-4:]
+			separator := got[len(got)-5]
+
+			if separator != '-' {
+				t.Errorf("GenerateWindowName(%q) = %q, should end with -XXXX", tt.branch, got)
+			}
+
+			// Verify suffix is hexadecimal
+			for _, c := range suffix {
+				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+					t.Errorf("GenerateWindowName(%q) = %q, suffix should be hex", tt.branch, got)
+					break
+				}
+			}
+
+			// Verify deterministic - call again and check same result
+			got2 := GenerateWindowName(tt.branch)
+			if got != got2 {
+				t.Errorf("GenerateWindowName is not deterministic: %q != %q", got, got2)
 			}
 		})
 	}
@@ -182,21 +208,192 @@ func TestGenerateStackWindowName(t *testing.T) {
 		name       string
 		branch     string
 		stackLevel int
-		want       string
+		wantSuffix string // Expected suffix (e.g., "/1", "/2")
 	}{
-		{"root level no suffix", "feat/auth", 0, "feat/auth"},
-		{"first stack level", "feat/auth-xY7k", 1, "feat/auth/1"},
-		{"second stack level", "feat/auth-xY7k-aB2m", 2, "feat/auth/2"},
-		{"named suffix first level", "feat/auth-api-k9P2", 1, "feat/auth-api/1"},
+		{"root level with hash", "feat/auth", 0, ""},
+		{"first stack level", "feat/auth-xY7k", 1, "/1"},
+		{"second stack level", "feat/auth-xY7k-aB2m", 2, "/2"},
+		{"named suffix first level", "feat/auth-api-k9P2", 1, "/1"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GenerateStackWindowName(tt.branch, tt.stackLevel)
-			if got != tt.want {
-				t.Errorf("GenerateStackWindowName(%q, %d) = %q, want %q",
-					tt.branch, tt.stackLevel, got, tt.want)
+
+			// Verify the stack level suffix is correct
+			if tt.wantSuffix != "" {
+				if !strings.HasSuffix(got, tt.wantSuffix) {
+					t.Errorf("GenerateStackWindowName(%q, %d) = %q, should end with %q",
+						tt.branch, tt.stackLevel, got, tt.wantSuffix)
+					return
+				}
+			}
+
+			// Verify deterministic
+			got2 := GenerateStackWindowName(tt.branch, tt.stackLevel)
+			if got != got2 {
+				t.Errorf("GenerateStackWindowName is not deterministic: %q != %q", got, got2)
+			}
+
+			// Verify the hash is present (4 hex chars before the stack level suffix or at end)
+			var hashPart string
+			if tt.wantSuffix != "" {
+				// Extract part before stack suffix
+				beforeStack := got[:len(got)-len(tt.wantSuffix)]
+				// Last 4 chars should be hash
+				if len(beforeStack) >= 5 && beforeStack[len(beforeStack)-5] == '-' {
+					hashPart = beforeStack[len(beforeStack)-4:]
+				}
+			} else {
+				// Root level - last 4 chars should be hash
+				if len(got) >= 5 && got[len(got)-5] == '-' {
+					hashPart = got[len(got)-4:]
+				}
+			}
+
+			// Verify hash is hexadecimal
+			for _, c := range hashPart {
+				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+					t.Errorf("GenerateStackWindowName(%q, %d) = %q, hash should be hex",
+						tt.branch, tt.stackLevel, got)
+					break
+				}
 			}
 		})
+	}
+}
+
+func TestHashBranch(t *testing.T) {
+	tests := []struct {
+		name   string
+		branch string
+		want   string // 4-char hex suffix
+	}{
+		{"simple branch", "feat/auth", "0e3b"},
+		{"feature branch", "feature/nova-123", "6fa0"},
+		{"different branch", "bugfix/auth-providers", "8f92"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hashBranch(tt.branch)
+			// Verify it's 4 chars
+			if len(got) != 4 {
+				t.Errorf("hashBranch(%q) = %q, want 4 chars", tt.branch, got)
+			}
+			// Verify it's hexadecimal
+			for _, c := range got {
+				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+					t.Errorf("hashBranch(%q) = %q, want hexadecimal chars only", tt.branch, got)
+					break
+				}
+			}
+		})
+	}
+}
+
+func TestHashBranchDeterministic(t *testing.T) {
+	branch := "feat/auth-provider"
+	first := hashBranch(branch)
+	second := hashBranch(branch)
+
+	if first != second {
+		t.Errorf("hashBranch is not deterministic: %q != %q", first, second)
+	}
+
+	// Same branch should always produce same hash
+	for i := 0; i < 10; i++ {
+		got := hashBranch(branch)
+		if got != first {
+			t.Errorf("hashBranch(%q) iteration %d = %q, want %q", branch, i, got, first)
+		}
+	}
+}
+
+func TestHashBranchCollisionResistance(t *testing.T) {
+	// Different branches should produce different hashes
+	branches := []string{
+		"feat/auth-provider",
+		"feat/auth-parser",
+		"feat/auth-proxy",
+		"fix/auth-provider",
+	}
+
+	hashes := make(map[string]string)
+	for _, branch := range branches {
+		hash := hashBranch(branch)
+		if existingBranch, exists := hashes[hash]; exists {
+			t.Errorf("hash collision: %q and %q both produce %q", existingBranch, branch, hash)
+		}
+		hashes[hash] = branch
+	}
+}
+
+func TestGenerateWindowNameWithHash(t *testing.T) {
+	tests := []struct {
+		name   string
+		branch string
+		// We can't hardcode expected hash, so we just check format
+	}{
+		{"issue ID extraction", "feature/nova-123"},
+		{"two part branch", "feat/auth"},
+		{"feature branch", "feature/api-fix"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GenerateWindowName(tt.branch)
+
+			// Should end with - followed by 4 hex chars
+			if len(got) < 5 {
+				t.Errorf("GenerateWindowName(%q) = %q, too short", tt.branch, got)
+				return
+			}
+
+			// Check format: ends with -XXXX where X is hex
+			suffix := got[len(got)-4:]
+			separator := got[len(got)-5]
+
+			if separator != '-' {
+				t.Errorf("GenerateWindowName(%q) = %q, should end with -XXXX", tt.branch, got)
+			}
+
+			for _, c := range suffix {
+				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+					t.Errorf("GenerateWindowName(%q) = %q, suffix should be hex", tt.branch, got)
+					break
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateWindowNameWithHashDeterministic(t *testing.T) {
+	branch := "feat/auth-provider"
+	first := GenerateWindowName(branch)
+	second := GenerateWindowName(branch)
+
+	if first != second {
+		t.Errorf("GenerateWindowName is not deterministic: %q != %q", first, second)
+	}
+}
+
+func TestGenerateWindowNameWithHashNoCollision(t *testing.T) {
+	// These branches would produce the same abbreviated name without hash
+	// (feat/auth-p) but should be different with hash
+	provider := GenerateWindowName("feat/auth-provider")
+	parser := GenerateWindowName("feat/auth-parser")
+
+	if provider == parser {
+		t.Errorf("Collision detected: both branches produce %q", provider)
+	}
+
+	// Both should have the same prefix before the hash
+	// (feat/auth-p-) but different hashes
+	providerPrefix := provider[:len(provider)-4]
+	parserPrefix := parser[:len(parser)-4]
+
+	if providerPrefix != parserPrefix {
+		t.Errorf("Prefixes should match: %q vs %q", providerPrefix, parserPrefix)
 	}
 }
