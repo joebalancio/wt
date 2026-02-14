@@ -6,9 +6,9 @@ import (
 )
 
 func TestClient_CreateNewWindow(t *testing.T) {
-	// Skip if not in tmux or tmux not available
-	if os.Getenv("TMUX") == "" {
-		t.Skip("skipping test: not in tmux")
+	// Skip integration tests unless explicitly enabled
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
 	}
 
 	client, err := NewClient()
@@ -27,6 +27,11 @@ func TestClient_CreateNewWindow(t *testing.T) {
 }
 
 func TestClient_CreateNewWindow_InvalidTarget(t *testing.T) {
+	// Skip integration tests unless explicitly enabled
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
+	}
+
 	// This test validates error handling for invalid window creation
 	// We'll use a mock approach to test error conditions
 
@@ -43,8 +48,8 @@ func TestClient_CreateNewWindow_InvalidTarget(t *testing.T) {
 }
 
 func TestClient_WindowExists(t *testing.T) {
-	if os.Getenv("TMUX") == "" {
-		t.Skip("skipping test: not in tmux")
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
 	}
 
 	client, err := NewClient()
@@ -63,8 +68,8 @@ func TestClient_WindowExists(t *testing.T) {
 }
 
 func TestClient_SelectWindow(t *testing.T) {
-	if os.Getenv("TMUX") == "" {
-		t.Skip("skipping test: not in tmux")
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
 	}
 
 	client, err := NewClient()
@@ -84,8 +89,8 @@ func TestClient_SelectWindow(t *testing.T) {
 }
 
 func TestClient_SendKeys(t *testing.T) {
-	if os.Getenv("TMUX") == "" {
-		t.Skip("skipping test: not in tmux")
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
 	}
 
 	client, err := NewClient()
@@ -133,8 +138,8 @@ func TestParseWindowList_Empty(t *testing.T) {
 }
 
 func TestClient_CreateOrSelectWindow_NewWindow(t *testing.T) {
-	if os.Getenv("TMUX") == "" {
-		t.Skip("skipping test: not in tmux")
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
 	}
 
 	client, err := NewClient()
@@ -163,8 +168,8 @@ func TestClient_CreateOrSelectWindow_NewWindow(t *testing.T) {
 }
 
 func TestClient_CreateOrSelectWindow_ExistingWindow(t *testing.T) {
-	if os.Getenv("TMUX") == "" {
-		t.Skip("skipping test: not in tmux")
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
 	}
 
 	client, err := NewClient()
