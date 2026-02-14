@@ -31,6 +31,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default is $HOME/.config/wt/config.yaml or .wt.yaml in project)")
 	rootCmd.PersistentFlags().CountP("verbose", "v", "verbose output (can be used multiple times)")
 	rootCmd.PersistentFlags().Bool("no-tmux", false, "skip tmux window creation")
+	rootCmd.PersistentFlags().Bool("dry-run", false, "show what would be done without making changes")
 }
 
 // Verbose returns the verbosity level
@@ -43,6 +44,12 @@ func Verbose() int {
 func NoTmux() bool {
 	noTmux, _ := rootCmd.PersistentFlags().GetBool("no-tmux")
 	return noTmux
+}
+
+// GetDryRun returns the value of the --dry-run flag
+func GetDryRun() bool {
+	dryRun, _ := rootCmd.PersistentFlags().GetBool("dry-run")
+	return dryRun
 }
 
 // isInTmux checks if currently running in tmux

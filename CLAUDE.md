@@ -77,6 +77,67 @@ wt config validate
 - `internal/config/config.go:ValidateSchema()` - Schema validation
 
 
+### wt done command
+
+Complete and remove a worktree by merging it into the current branch.
+
+```bash
+# Complete a worktree (merge and remove)
+wt done /path/to/worktree feature-branch
+
+# Force complete even with uncommitted changes
+wt done --force /path/to/worktree feature-branch
+
+# Dry run - show what would be done
+wt done --dry-run /path/to/worktree feature-branch
+```
+
+**What it does:**
+1. Validates the branch exists
+2. Checks if worktree is dirty (fails unless --force is used)
+3. Performs squash merge of feature branch into current branch
+4. Creates merge commit with message "Merge <branch>"
+5. Runs `on_worktree_done` hooks (if configured)
+6. Removes the worktree
+7. Deletes the feature branch
+8. Runs `on_worktree_remove` hooks (if configured)
+
+**Flags:**
+- `--force` - Force completion even with uncommitted changes in the worktree
+- `--dry-run` - Show what would be done without making changes (global flag)
+
+**Hooks:**
+Hooks are run at two points during the done workflow:
+
+- `on_worktree_done` - Runs after merge but before worktree removal
+  - Template variables: `{branch}`, `{worktree_path}`
+  - Use case: Notifications, cleanup scripts, API calls
+
+- `on_worktree_remove` - Runs after worktree removal
+  - Template variables: `{branch}`, `{worktree_path}`
+  - Note: worktree no longer exists when these hooks run
+
+**Example hook configuration:**
+```yaml
+hooks:
+  on_worktree_done:
+    - run: echo "Branch {branch} completed" >> /tmp/wt.log
+    - run: slack-cli -c "#dev" "Merged {branch}"
+  on_worktree_remove:
+    - run: echo "Cleaned up {branch}" >> /tmp/wt.log
+```
+
+**Implementation files:**
+- `internal/cli/done.go` - CLI command implementation
+- `internal/cli/done_test.go` - Command structure tests
+- `internal/worktree/service.go:Done()` - Service layer logic
+- `internal/worktree/service_test.go:TestService_Done()` - Unit tests
+- `tests/done_integration_test.go` - Basic integration tests
+- `tests/done_hooks_integration_test.go` - Hook integration tests
+- `tests/done_conflict_integration_test.go` - Merge conflict tests
+- `tests/done_dirty_integration_test.go` - Dirty worktree tests
+
+
 ## Architecture Overview
 
 wt is a CLI tool that orchestrates three external tools: git, tmux, and user-defined hook commands. The architecture is organized around **client wrappers** for external tools and a **configuration-driven hook system**.

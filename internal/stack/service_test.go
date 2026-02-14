@@ -353,6 +353,22 @@ func (m *MockGitClient) BranchExists(_ context.Context, _ string) (bool, error) 
 	return false, nil
 }
 
+func (m *MockGitClient) DeleteBranch(_ context.Context, _ string, _ bool) error {
+	return nil
+}
+
+func (m *MockGitClient) SquashMerge(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *MockGitClient) CreateSquashCommit(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *MockGitClient) IsWorktreeDirty(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
 // MockSpiceClient is a mock implementation of SpiceClient for testing
 type MockSpiceClient struct {
 	createFunc func(context.Context, spice.BranchCreateSpec) (*spice.Branch, error)

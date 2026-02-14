@@ -906,3 +906,265 @@ func Benchmark_AddWorktree(b *testing.B) {
 		client.RemoveWorktree(ctx, worktree.Path, true)
 	}
 }
+
+// TestIntegration_DeleteBranch tests deleting a branch after removing its worktree
+func TestIntegration_DeleteBranch(t *testing.T) {
+	skipIfNoGit(t)
+
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	repoPath, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Change to repo directory
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	if err := os.Chdir(repoPath); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	client, err := git.NewClient()
+	if err != nil {
+		t.Fatalf("failed to create git client: %v", err)
+	}
+
+	// Create a worktree with a new branch
+	branchName := "feature/to-delete"
+	spec := domain.WorktreeCreateSpec{
+		Branch: branchName,
+		Path:   filepath.Join(repoPath, "to-delete"),
+	}
+
+	worktree, err := client.AddWorktree(ctx, spec)
+	if err != nil {
+		t.Fatalf("failed to add worktree: %v", err)
+	}
+
+	// Verify branch exists
+	exists, err := client.BranchExists(ctx, branchName)
+	if err != nil {
+		t.Fatalf("failed to check if branch exists: %v", err)
+	}
+	if !exists {
+		t.Fatal("branch should exist after worktree creation")
+	}
+
+	// Remove the worktree first (required before deleting branch)
+	if err := client.RemoveWorktree(ctx, worktree.Path, true); err != nil {
+		t.Fatalf("failed to remove worktree: %v", err)
+	}
+
+	// Delete the branch (non-force, safe deletion)
+	if err := client.DeleteBranch(ctx, branchName, false); err != nil {
+		t.Fatalf("failed to delete branch: %v", err)
+	}
+
+	// Verify branch no longer exists
+	exists, err = client.BranchExists(ctx, branchName)
+	if err != nil {
+		t.Fatalf("failed to check if branch exists after deletion: %v", err)
+	}
+	if exists {
+		t.Error("branch should not exist after deletion")
+	}
+}
+
+// TestIntegration_SquashMergeCommit tests squash merge and commit workflow
+func TestIntegration_SquashMergeCommit(t *testing.T) {
+	skipIfNoGit(t)
+
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	repoPath, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Change to repo directory
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	if err := os.Chdir(repoPath); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	client, err := git.NewClient()
+	if err != nil {
+		t.Fatalf("failed to create git client: %v", err)
+	}
+
+	// Create a feature worktree with some commits
+	featureBranch := "feature/squash-merge-test"
+	featureSpec := domain.WorktreeCreateSpec{
+		Branch: featureBranch,
+		Path:   filepath.Join(repoPath, "feature-squash"),
+	}
+
+	featureWorktree, err := client.AddWorktree(ctx, featureSpec)
+	if err != nil {
+		t.Fatalf("failed to add feature worktree: %v", err)
+	}
+	defer client.RemoveWorktree(ctx, featureWorktree.Path, true)
+
+	// Add a commit to the feature branch
+	featureFile := filepath.Join(featureWorktree.Path, "feature.txt")
+	if err := os.WriteFile(featureFile, []byte("feature content\n"), 0o644); err != nil {
+		t.Fatalf("failed to create feature file: %v", err)
+	}
+
+	runGitCommand(t, featureWorktree.Path, "add", "feature.txt")
+	runGitCommand(t, featureWorktree.Path, "commit", "-m", "Add feature file")
+
+	// Get the current branch (should be the main worktree on main)
+	currentBranch, err := client.GetCurrentBranch(ctx)
+	if err != nil {
+		t.Fatalf("failed to get current branch: %v", err)
+	}
+
+	// Ensure we're on main branch for the merge
+	if currentBranch != "main" {
+		// Switch to main branch
+		runGitCommand(t, repoPath, "checkout", "main")
+	}
+
+	// Perform squash merge from feature branch
+	if err := client.SquashMerge(ctx, featureBranch); err != nil {
+		t.Fatalf("failed to squash merge: %v", err)
+	}
+
+	// Create the squash commit
+	commitMessage := "Squashed feature branch"
+	if err := client.CreateSquashCommit(ctx, commitMessage); err != nil {
+		t.Fatalf("failed to create squash commit: %v", err)
+	}
+
+	// Verify the commit was created by checking the log
+	cmd := exec.Command("git", "log", "--oneline", "-n", "1")
+	cmd.Dir = repoPath
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("failed to get git log: %v", err)
+	}
+
+	logOutput := string(output)
+	if !strings.Contains(logOutput, commitMessage) {
+		t.Errorf("expected commit message %q in log, got: %s", commitMessage, logOutput)
+	}
+
+	// Verify the feature file exists in main
+	mainFeatureFile := filepath.Join(repoPath, "feature.txt")
+	content, err := os.ReadFile(mainFeatureFile)
+	if err != nil {
+		t.Fatalf("failed to read feature file from main: %v", err)
+	}
+	if string(content) != "feature content\n" {
+		t.Errorf("expected feature content, got: %s", string(content))
+	}
+}
+
+// TestIntegration_IsWorktreeDirty tests checking if a worktree has uncommitted changes
+func TestIntegration_IsWorktreeDirty(t *testing.T) {
+	skipIfNoGit(t)
+
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	repoPath, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Change to repo directory
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	if err := os.Chdir(repoPath); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	client, err := git.NewClient()
+	if err != nil {
+		t.Fatalf("failed to create git client: %v", err)
+	}
+
+	// Create a new worktree for testing
+	featureBranch := "feature/dirty-test"
+	featureSpec := domain.WorktreeCreateSpec{
+		Branch: featureBranch,
+		Path:   filepath.Join(repoPath, "dirty-test"),
+	}
+
+	featureWorktree, err := client.AddWorktree(ctx, featureSpec)
+	if err != nil {
+		t.Fatalf("failed to add feature worktree: %v", err)
+	}
+	defer client.RemoveWorktree(ctx, featureWorktree.Path, true)
+
+	// The new worktree might have some index state differences from the repo setup.
+	// First, let's ensure the worktree is in a clean state by resetting it.
+	runGitCommand(t, featureWorktree.Path, "reset", "--hard")
+
+	// Now the worktree should be clean
+	isDirty, err := client.IsWorktreeDirty(ctx, featureWorktree.Path)
+	if err != nil {
+		t.Fatalf("failed to check if worktree is clean: %v", err)
+	}
+	if isDirty {
+		t.Error("expected worktree to be clean after reset")
+	}
+
+	// Add an untracked file (should make worktree dirty)
+	untrackedFile := filepath.Join(featureWorktree.Path, "untracked.txt")
+	if err := os.WriteFile(untrackedFile, []byte("untracked content\n"), 0o644); err != nil {
+		t.Fatalf("failed to create untracked file: %v", err)
+	}
+
+	isDirty, err = client.IsWorktreeDirty(ctx, featureWorktree.Path)
+	if err != nil {
+		t.Fatalf("failed to check if worktree with untracked file is dirty: %v", err)
+	}
+	if !isDirty {
+		t.Error("expected worktree with untracked file to be dirty")
+	}
+
+	// Clean up untracked file
+	os.Remove(untrackedFile)
+
+	// Add a modified file (should make worktree dirty)
+	modifiedFile := filepath.Join(featureWorktree.Path, "modified.txt")
+	if err := os.WriteFile(modifiedFile, []byte("original content\n"), 0o644); err != nil {
+		t.Fatalf("failed to create modified file: %v", err)
+	}
+	runGitCommand(t, featureWorktree.Path, "add", "modified.txt")
+	runGitCommand(t, featureWorktree.Path, "commit", "-m", "Add modified file")
+
+	// Modify the file
+	if err := os.WriteFile(modifiedFile, []byte("modified content\n"), 0o644); err != nil {
+		t.Fatalf("failed to modify file: %v", err)
+	}
+
+	isDirty, err = client.IsWorktreeDirty(ctx, featureWorktree.Path)
+	if err != nil {
+		t.Fatalf("failed to check if worktree with modified file is dirty: %v", err)
+	}
+	if !isDirty {
+		t.Error("expected worktree with modified file to be dirty")
+	}
+}

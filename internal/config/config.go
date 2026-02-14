@@ -26,6 +26,7 @@ type GlobalConfig struct {
 // HooksConfig defines hook configurations
 type HooksConfig struct {
 	OnWorktreeCreate []Hook `yaml:"on_worktree_create"`
+	OnWorktreeDone   []Hook `yaml:"on_worktree_done,omitempty"`
 	OnWorktreeRemove []Hook `yaml:"on_worktree_remove,omitempty"`
 }
 

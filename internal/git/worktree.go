@@ -196,6 +196,64 @@ func (c *Client) PruneWorktrees(ctx context.Context) error {
 	return nil
 }
 
+// DeleteBranch deletes a git branch.
+// The force flag determines whether to use -D (force) or -d (safe) deletion.
+func (c *Client) DeleteBranch(ctx context.Context, branch string, force bool) error {
+	args := []string{"branch"}
+	if force {
+		args = append(args, "-D")
+	} else {
+		args = append(args, "-d")
+	}
+	args = append(args, branch)
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("deleting branch %q: %w: %s", branch, err, stderr.String())
+	}
+	return nil
+}
+
+// SquashMerge performs a squash merge from the source branch into the current branch.
+// This stages the changes without creating a commit.
+func (c *Client) SquashMerge(ctx context.Context, sourceBranch string) error {
+	args := []string{"merge", "--squash", sourceBranch}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("squash merge %q: %w: %s", sourceBranch, err, stderr.String())
+	}
+	return nil
+}
+
+// CreateSquashCommit creates a commit with the given message for staged squash merge changes.
+func (c *Client) CreateSquashCommit(ctx context.Context, message string) error {
+	args := []string{"commit", "-m", message}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("creating squash commit: %w: %s", err, stderr.String())
+	}
+	return nil
+}
+
+// IsWorktreeDirty checks if a worktree has any uncommitted changes.
+// Returns true if there are modified, staged, or untracked files.
+func (c *Client) IsWorktreeDirty(ctx context.Context, path string) (bool, error) {
+	args := []string{"-C", path, "status", "--porcelain"}
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("checking worktree status: %w: %s", err, stderr.String())
+	}
+	return stdout.Len() > 0, nil
+}
+
 func parseWorktreeOutput(output string) ([]*domain.Worktree, error) {
 	var worktrees []*domain.Worktree
 	currentIndex := -1

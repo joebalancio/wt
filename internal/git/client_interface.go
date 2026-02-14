@@ -19,4 +19,8 @@ type GitClient interface {
 	GetRepoInfo(ctx context.Context) (*domain.GitRepo, error)
 	BranchExists(ctx context.Context, branch string) (bool, error)
 	GetCurrentBranch(ctx context.Context) (string, error)
+	DeleteBranch(ctx context.Context, branch string, force bool) error
+	SquashMerge(ctx context.Context, sourceBranch string) error
+	CreateSquashCommit(ctx context.Context, message string) error
+	IsWorktreeDirty(ctx context.Context, path string) (bool, error)
 }
