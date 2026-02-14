@@ -1,6 +1,6 @@
 # Makefile for wt - AI-friendly development commands
 
-.PHONY: help build test lint clean fmt install deps dev run
+.PHONY: help build test test-unit test-integration test-all lint clean fmt install deps dev run
 
 # Variables
 BINARY_NAME=wt
@@ -43,16 +43,29 @@ lint:
 lint-fix:
 	golangci-lint run --config .golangci.yml --fix ./...
 
-## test: Run tests
+## test: Run unit tests only (fast, no external processes)
 test:
-	$(GO) test -race -coverprofile=coverage.out ./...
+	$(GO) test -race ./...
 
-## test-verbose: Run tests with verbose output
+## test-unit: Alias for test (explicit naming)
+test-unit: test
+
+## test-verbose: Run unit tests with verbose output
 test-verbose:
 	$(GO) test -race -v ./...
 
-## test-cover: Run tests and show coverage in browser
-test-cover: test
+## test-integration: Run integration tests with real git/tmux
+test-integration:
+	WT_INTEGRATION_TEST=1 $(GO) test -race -v ./...
+
+## test-all: Run both unit and integration tests
+test-all:
+	$(MAKE) test
+	$(MAKE) test-integration
+
+## test-cover: Run unit tests and show coverage in browser
+test-cover:
+	$(GO) test -race -coverprofile=coverage.out ./...
 	$(GO) tool cover -html=coverage.out
 
 ## build: Build the binary

@@ -61,6 +61,14 @@ func skipIfNoGit(t testing.TB) {
 	}
 }
 
+// skipIfNoIntegrationTest skips the test unless WT_INTEGRATION_TEST=1 is set
+func skipIfNoIntegrationTest(t testing.TB) {
+	t.Helper()
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
+	}
+}
+
 // TestIntegration_WorktreeLifecycle tests the complete worktree lifecycle:
 // 1. Create a worktree for a new branch
 // 2. List worktrees and verify the new one appears
@@ -68,6 +76,7 @@ func skipIfNoGit(t testing.TB) {
 // 4. Verify it's gone from the list
 func TestIntegration_WorktreeLifecycle(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -174,6 +183,7 @@ func TestIntegration_WorktreeLifecycle(t *testing.T) {
 // TestIntegration_WorktreeService tests the worktree service layer
 func TestIntegration_WorktreeService(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -265,6 +275,7 @@ func TestIntegration_WorktreeService(t *testing.T) {
 // TestIntegration_WorktreeWithBase tests creating a worktree from a specific base
 func TestIntegration_WorktreeWithBase(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -317,6 +328,7 @@ func TestIntegration_WorktreeWithBase(t *testing.T) {
 // TestIntegration_WorktreeWithPath tests creating a worktree with an explicit path
 func TestIntegration_WorktreeWithPath(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -378,6 +390,7 @@ func TestIntegration_WorktreeWithPath(t *testing.T) {
 // TestIntegration_RemoveNonExistentWorktree tests error handling when removing a non-existent worktree
 func TestIntegration_RemoveNonExistentWorktree(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -417,6 +430,7 @@ func TestIntegration_RemoveNonExistentWorktree(t *testing.T) {
 // TestIntegration_AddDuplicateWorktree tests error handling when adding a duplicate worktree
 func TestIntegration_AddDuplicateWorktree(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -474,6 +488,7 @@ func TestIntegration_AddDuplicateWorktree(t *testing.T) {
 // TestIntegration_GetRepoInfo tests getting repository information
 func TestIntegration_GetRepoInfo(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -528,6 +543,7 @@ func TestIntegration_GetRepoInfo(t *testing.T) {
 // TestIntegration_BranchExists tests checking if a branch exists
 func TestIntegration_BranchExists(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -602,6 +618,7 @@ func TestIntegration_BranchExists(t *testing.T) {
 // TestIntegration_WorktreeFilter tests filtering worktrees
 func TestIntegration_WorktreeFilter(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -704,6 +721,7 @@ func TestIntegration_WorktreeFilter(t *testing.T) {
 // TestIntegration_WorktreeForce tests the force flag when removing worktrees
 func TestIntegration_WorktreeForce(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -770,6 +788,7 @@ func TestIntegration_WorktreeForce(t *testing.T) {
 // TestIntegration_WorktreeNoCheckout tests creating a worktree without checking out files
 func TestIntegration_WorktreeNoCheckout(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -826,6 +845,7 @@ func TestIntegration_WorktreeNoCheckout(t *testing.T) {
 // TestIntegration_InvalidSpec tests validation of worktree create specs
 func TestIntegration_InvalidSpec(t *testing.T) {
 	skipIfNoGit(t)
+	skipIfNoIntegrationTest(t)
 
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
