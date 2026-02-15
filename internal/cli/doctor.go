@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -152,31 +151,24 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 }
 
 func checkConfiguration(out io.Writer) bool {
-	// Check user config
-	home, err := os.UserHomeDir()
+	// Find project and global configs
+	projectPath, globalPath, err := config.FindConfigs("")
 	if err != nil {
-		home = os.Getenv("HOME")
-		if home == "" {
-			fmt.Fprintf(out, "! Cannot determine home directory\n")
-			return false
-		}
-	}
-	configPath := filepath.Join(home, ".config", "wt", "config.yaml")
-
-	if _, err := os.Stat(configPath); err != nil {
-		if os.IsNotExist(err) {
-			fmt.Fprintf(out, "! User config not found: %s\n", configPath)
-			fmt.Fprintf(out, "  Run 'wt init' to create default config\n")
-			return false
-		}
-		fmt.Fprintf(out, "! Cannot access config: %v\n", err)
+		fmt.Fprintf(out, "! No configuration file found\n")
+		fmt.Fprintf(out, "  Run 'wt init' to create default config\n")
 		return false
 	}
 
-	fmt.Fprintf(out, "✓ User config: %s\n", configPath)
+	// Report which configs are active
+	if projectPath != "" {
+		fmt.Fprintf(out, "✓ Project config: %s\n", projectPath)
+	}
+	if globalPath != "" {
+		fmt.Fprintf(out, "✓ Global config: %s\n", globalPath)
+	}
 
-	// Validate config
-	cfg, err := config.Load(configPath)
+	// Validate merged config
+	cfg, err := config.LoadMerged(projectPath, globalPath)
 	if err != nil {
 		fmt.Fprintf(out, "! Config is invalid: %v\n", err)
 		return false

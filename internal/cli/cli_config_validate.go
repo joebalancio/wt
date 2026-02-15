@@ -15,31 +15,38 @@ func NewConfigValidateCmd() *cobra.Command {
 		Short: "Validate configuration (YAML + schema)",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			configPath, err := config.FindConfig("")
+			customPath, _ := cmd.Flags().GetString("config")
+
+			projectPath, globalPath, err := config.FindConfigs(customPath)
 			if err != nil {
 				fmt.Fprintln(cmd.OutOrStderr(), "✗ No config file found")
 				os.Exit(1)
 			}
 
-			// Parse YAML
-			cfg, err := config.Load(configPath)
+			// Validate merged config
+			cfg, err := config.LoadMerged(projectPath, globalPath)
 			if err != nil {
 				fmt.Fprintf(cmd.OutOrStderr(),
-					"✗ YAML syntax error: %v\n", err)
+					"✗ Config load error: %v\n", err)
 				os.Exit(1)
 			}
 
-			// Validate schema
+			// Schema validation
 			if err := cfg.ValidateSchema(); err != nil {
 				fmt.Fprintf(cmd.OutOrStderr(),
-					"✗ Schema validation failed: %v\n", err)
+					"✗ Schema validation error: %v\n", err)
 				os.Exit(1)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(),
-				"✓ Config is valid: %s\n", configPath)
-			fmt.Fprintln(cmd.OutOrStdout(), "✓ YAML syntax valid")
-			fmt.Fprintln(cmd.OutOrStdout(), "✓ Schema validation passed")
+			fmt.Fprintln(cmd.OutOrStdout(), "✓ Configuration is valid")
+
+			// Show which configs are active
+			if projectPath != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "  Project: %s\n", projectPath)
+			}
+			if globalPath != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "  Global: %s\n", globalPath)
+			}
 		},
 	}
 }

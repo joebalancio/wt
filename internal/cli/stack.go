@@ -213,11 +213,16 @@ func isProtectedBranch(branch string) bool {
 }
 
 func loadConfigForCommand() (*config.Config, error) {
-	configPath, err := config.FindConfig("")
+	// Check for --config flag
+	customPath, _ := rootCmd.PersistentFlags().GetString("config")
+
+	projectPath, globalPath, err := config.FindConfigs(customPath)
 	if err != nil {
+		// No config found - return defaults
 		return config.DefaultConfig(), nil
 	}
-	return config.Load(configPath)
+
+	return config.LoadMerged(projectPath, globalPath)
 }
 
 // validateGitSpiceConfig validates git-spice configuration
