@@ -52,9 +52,11 @@ jobs:
         run: |
           # Run tests inside a tmux session (required for tmux window operations)
           tmux new-session -d -s ci -x 120 -y 40
-          tmux send-keys -t ci "make test-integration; echo \$? > /tmp/exitcode" Enter
+          tmux send-keys -t ci "make test-integration 2>&1 | tee /tmp/test-output.log; echo \$? > /tmp/exitcode" Enter
           # Wait for tests to complete
           while [ ! -f /tmp/exitcode ]; do sleep 2; done
+          # Show test output
+          cat /tmp/test-output.log
           tmux kill-session -t ci 2>/dev/null || true
           exit $(cat /tmp/exitcode)
         env:
