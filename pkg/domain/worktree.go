@@ -17,6 +17,46 @@ type Worktree struct {
 	Modified bool   // Has uncommitted changes
 }
 
+// ForceLevel represents the force level for remove operations.
+type ForceLevel int
+
+const (
+	// ForceNone performs safe removal (no force).
+	ForceNone ForceLevel = iota
+	// ForceLocal forces local worktree and branch deletion.
+	ForceLocal
+	// ForceRemote forces local deletion and also deletes remote branch.
+	ForceRemote
+)
+
+// String returns the string representation of the force level.
+func (f ForceLevel) String() string {
+	switch f {
+	case ForceNone:
+		return "none"
+	case ForceLocal:
+		return "local"
+	case ForceRemote:
+		return "remote"
+	default:
+		return "unknown"
+	}
+}
+
+// ParseForceLevel parses a string into a ForceLevel.
+func ParseForceLevel(s string) (ForceLevel, error) {
+	switch s {
+	case "", "false", "0":
+		return ForceNone, nil
+	case "true", "1", "local":
+		return ForceLocal, nil
+	case "remote", "all":
+		return ForceRemote, nil
+	default:
+		return ForceNone, fmt.Errorf("invalid --force value %q. Use: true, remote, or all", s)
+	}
+}
+
 // String returns a formatted representation of the worktree
 func (w *Worktree) String() string {
 	if w == nil {
