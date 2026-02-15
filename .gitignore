@@ -44,3 +44,6 @@ tmp/
 
 # Git
 .worktrees/
+
+# wt - project-local config
+.wt.yaml
