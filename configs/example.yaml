@@ -1,11 +1,18 @@
-# Example wt configuration file
-# Copy to ~/.config/wt/config.yaml or .wt.yaml in your project
+# Example wt GLOBAL configuration file
+# Copy to ~/.config/wt/config.yaml
+#
+# For project-specific settings, create a .wt.yaml file at your repository root.
+# Project config overlays global config with these merge semantics:
+#   - Scalars (strings, bools): project value replaces global
+#   - Arrays (hooks): project array replaces global entirely
+#   - Undefined fields: inherit from global
 
 global:
   # Prefix for tmux session names
   tmux_session_prefix: "wt-"
 
 # Hooks run automatically after worktree operations
+# NOTE: These are global defaults. Override in .wt.yaml for project-specific hooks.
 hooks:
   on_worktree_create:
     # Example: Install Node.js dependencies
@@ -23,14 +30,6 @@ hooks:
     - run: "rm -rf node_modules"
       cwd: "{worktree_path}"
 
-# Project-specific overrides (matched by glob pattern)
-project_overrides:
-  - match: "**/*rust*"
-    hooks:
-      on_worktree_create:
-        - run: "cargo fetch"
-          cwd: "{worktree_path}"
-
 # Tmux settings
 tmux:
   # Layout: main-vertical, main-horizontal, even-horizontal, tiled, etc.
@@ -41,6 +40,13 @@ tmux:
 
   # Automatically attach to session after creation
   attach_on_create: true
+
+  # Window naming preferences
+  window_naming:
+    # Maximum length for window names (1-32)
+    max_length: 16
+    # Abbreviate issue IDs in window names (e.g., "nova-123" -> "n-123")
+    abbreviate_issue_id: true
 
 # Git-spice configuration for branch stacking
 spice:
@@ -55,3 +61,30 @@ worktree:
 
   # Custom path for dedicated mode (default: ~/worktrees)
   dedicated_path: "~/worktrees"
+
+# -----------------------------------------------------------------------------
+# PROJECT-LOCAL CONFIG (.wt.yaml)
+# -----------------------------------------------------------------------------
+# For project-specific settings, create a .wt.yaml file at your repository root.
+# This file is committed to version control and shared with your team.
+#
+# Example .wt.yaml for a Rust project:
+#
+# hooks:
+#   on_worktree_create:
+#     - run: "cargo fetch"
+#       cwd: "{worktree_path}"
+#     - run: "cargo build"
+#       cwd: "{worktree_path}"
+#       background: true
+#
+# tmux:
+#   attach_on_create: false  # Override global setting
+#
+# worktree:
+#   location: "per-repo"  # Use .worktrees/ inside repo
+#
+# The project config will overlay these settings on top of your global config.
+# Arrays like hooks are replaced entirely (not merged), so define all hooks
+# you need in the project config.
+# -----------------------------------------------------------------------------
