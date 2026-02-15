@@ -124,6 +124,40 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
+// LoadMerged loads and merges project and global configurations
+// Precedence: project > global > defaults
+// Merge semantics:
+//   - Scalars: project value replaces global
+//   - Arrays: project array replaces global entirely
+//   - Undefined: inherits from global/defaults
+func LoadMerged(projectPath, globalPath string) (*Config, error) {
+	cfg := DefaultConfig()
+
+	// Load global config first (if exists)
+	if globalPath != "" {
+		data, err := os.ReadFile(globalPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading global config: %w", err)
+		}
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("parsing global config: %w", err)
+		}
+	}
+
+	// Overlay project config (if exists)
+	if projectPath != "" {
+		data, err := os.ReadFile(projectPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading project config: %w", err)
+		}
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("parsing project config: %w", err)
+		}
+	}
+
+	return cfg, nil
+}
+
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	// No global validation required currently

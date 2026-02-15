@@ -8,6 +8,138 @@ import (
 	"testing"
 )
 
+func TestLoadMerged(t *testing.T) {
+	tests := []struct {
+		name                 string
+		globalYAML           string
+		projectYAML          string
+		wantLayout           string // empty means don't check
+		wantAttachOnCreate   *bool  // nil means don't check
+		wantOnWorktreeCreate []Hook // nil means don't check
+	}{
+		{
+			name: "project scalar overrides global",
+			globalYAML: `
+tmux:
+  attach_on_create: true
+`,
+			projectYAML: `
+tmux:
+  attach_on_create: false
+`,
+			wantAttachOnCreate: ptrBool(false),
+		},
+		{
+			name: "project array replaces global entirely",
+			globalYAML: `
+hooks:
+  on_worktree_create:
+    - run: "npm install"
+      cwd: "{worktree_path}"
+`,
+			projectYAML: `
+hooks:
+  on_worktree_create:
+    - run: "cargo fetch"
+      cwd: "{worktree_path}"
+`,
+			wantOnWorktreeCreate: []Hook{
+				{Run: "cargo fetch", Cwd: "{worktree_path}"},
+			},
+		},
+		{
+			name: "undefined project field inherits global",
+			globalYAML: `
+tmux:
+  layout: "main-horizontal"
+  attach_on_create: true
+`,
+			projectYAML: `
+tmux:
+  attach_on_create: false
+`,
+			wantLayout:         "main-horizontal", // inherited from global
+			wantAttachOnCreate: ptrBool(false),    // overridden by project
+		},
+		{
+			name:       "project only (no global)",
+			globalYAML: "",
+			projectYAML: `
+tmux:
+  layout: "project-layout"
+`,
+			wantLayout: "project-layout",
+		},
+		{
+			name: "global only (no project)",
+			globalYAML: `
+tmux:
+  layout: "global-layout"
+`,
+			projectYAML: "",
+			wantLayout:  "global-layout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+
+			var globalPath, projectPath string
+
+			// Write global config if provided
+			if tt.globalYAML != "" {
+				globalPath = filepath.Join(tempDir, "global.yaml")
+				if err := os.WriteFile(globalPath, []byte(tt.globalYAML), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// Write project config if provided
+			if tt.projectYAML != "" {
+				projectPath = filepath.Join(tempDir, "project.yaml")
+				if err := os.WriteFile(projectPath, []byte(tt.projectYAML), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			cfg, err := LoadMerged(projectPath, globalPath)
+			if err != nil {
+				t.Fatalf("LoadMerged() error = %v", err)
+			}
+
+			// Compare only the fields we care about
+			if tt.wantLayout != "" && cfg.Tmux.Layout != tt.wantLayout {
+				t.Errorf("Tmux.Layout = %q, want %q", cfg.Tmux.Layout, tt.wantLayout)
+			}
+			if tt.wantAttachOnCreate != nil && cfg.Tmux.AttachOnCreate != *tt.wantAttachOnCreate {
+				t.Errorf("Tmux.AttachOnCreate = %v, want %v", cfg.Tmux.AttachOnCreate, *tt.wantAttachOnCreate)
+			}
+			if tt.wantOnWorktreeCreate != nil {
+				if len(cfg.Hooks.OnWorktreeCreate) != len(tt.wantOnWorktreeCreate) {
+					t.Errorf("OnWorktreeCreate hooks = %d, want %d",
+						len(cfg.Hooks.OnWorktreeCreate), len(tt.wantOnWorktreeCreate))
+				} else {
+					for i, got := range cfg.Hooks.OnWorktreeCreate {
+						want := tt.wantOnWorktreeCreate[i]
+						if got.Run != want.Run {
+							t.Errorf("Hook[%d].Run = %q, want %q", i, got.Run, want.Run)
+						}
+						if got.Cwd != want.Cwd {
+							t.Errorf("Hook[%d].Cwd = %q, want %q", i, got.Cwd, want.Cwd)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+// ptrBool returns a pointer to a bool value
+func ptrBool(v bool) *bool {
+	return &v
+}
+
 func TestWorktreeConfig_IsDedicated(t *testing.T) {
 	tests := []struct {
 		name     string
