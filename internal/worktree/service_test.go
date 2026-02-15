@@ -3,6 +3,7 @@ package worktree
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/joebalancio/wt/internal/config"
@@ -340,6 +341,84 @@ func TestService_Remove(t *testing.T) {
 		err = svc.Remove(context.Background(), "/test/worktree", false)
 		if err == nil {
 			t.Fatal("Remove() expected error when git client fails, got nil")
+		}
+	})
+}
+
+func TestService_ResolveFromCWD(t *testing.T) {
+	t.Run("resolves worktree when CWD is inside worktree", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/home/user/repo", Branch: "main"},
+					{Path: "/home/user/worktrees/feat-auth", Branch: "feat-auth"},
+				}, nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		worktree, err := svc.ResolveFromCWD(context.Background(), "/home/user/worktrees/feat-auth/src")
+		if err != nil {
+			t.Fatalf("ResolveFromCWD() error = %v", err)
+		}
+		if worktree.Branch != "feat-auth" {
+			t.Errorf("got branch %s, want feat-auth", worktree.Branch)
+		}
+	})
+
+	t.Run("returns error when CWD is not in a worktree", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/home/user/repo", Branch: "main"},
+					{Path: "/home/user/worktrees/feat-auth", Branch: "feat-auth"},
+				}, nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		_, err = svc.ResolveFromCWD(context.Background(), "/home/other/project")
+		if err == nil {
+			t.Fatal("ResolveFromCWD() expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "not in a worktree") {
+			t.Errorf("expected 'not in a worktree' error, got: %v", err)
+		}
+	})
+
+	t.Run("prefers longer path match (nested worktrees)", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/home/user/repo", Branch: "main"},
+					{Path: "/home/user/worktrees/feat", Branch: "feat"},
+					{Path: "/home/user/worktrees/feat/nested", Branch: "feat/nested"},
+				}, nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		worktree, err := svc.ResolveFromCWD(context.Background(), "/home/user/worktrees/feat/nested/src")
+		if err != nil {
+			t.Fatalf("ResolveFromCWD() error = %v", err)
+		}
+		if worktree.Branch != "feat/nested" {
+			t.Errorf("got branch %s, want feat/nested", worktree.Branch)
 		}
 	})
 }

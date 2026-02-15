@@ -5,6 +5,7 @@ package worktree
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -120,6 +121,29 @@ func (s *Service) Remove(ctx context.Context, path string, force bool) error {
 	}
 
 	return nil
+}
+
+// ResolveFromCWD resolves the worktree containing the given current working directory.
+func (s *Service) ResolveFromCWD(ctx context.Context, cwd string) (*domain.Worktree, error) {
+	worktrees, err := s.git.ListWorktrees(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing worktrees: %w", err)
+	}
+
+	var bestMatch *domain.Worktree
+	for _, wt := range worktrees {
+		if strings.HasPrefix(cwd, wt.Path) {
+			if bestMatch == nil || len(wt.Path) > len(bestMatch.Path) {
+				bestMatch = wt
+			}
+		}
+	}
+
+	if bestMatch == nil {
+		return nil, errors.New("not in a worktree")
+	}
+
+	return bestMatch, nil
 }
 
 // Done completes a worktree by merging it, creating a commit, and removing it
