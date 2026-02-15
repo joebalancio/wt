@@ -6,13 +6,6 @@ run:
   timeout: 5m
   # Include test files
   tests: true
-  # Which dirs to skip
-  exclude-dirs:
-    - vendor
-    - bin
-  # Which files to skip
-  exclude-files:
-    - ".*\\.pb\\.go$"
 
 output:
   # Format: colored-line-number|line-number|json|tab|checkstyle
@@ -121,6 +114,13 @@ issues:
   new: false
   # Make issues output unique by line
   uniq-by-line: true
+  # Directories to exclude from analysis
+  exclude-dirs:
+    - vendor
+    - bin
+  # Files to exclude from analysis
+  exclude-files:
+    - ".*\\.pb\\.go$"
   # Exclude specific issues
   exclude-rules:
     # Exclude some linters from running on tests files
