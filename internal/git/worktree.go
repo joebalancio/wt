@@ -257,6 +257,57 @@ func (c *Client) IsWorktreeDirty(ctx context.Context, path string) (bool, error)
 	return stdout.Len() > 0, nil
 }
 
+// IsBranchMerged checks if a branch is merged into the default branch.
+func (c *Client) IsBranchMerged(ctx context.Context, branch string) (bool, error) {
+	repoInfo, err := c.GetRepoInfo(ctx)
+	if err != nil {
+		return false, fmt.Errorf("getting repo info: %w", err)
+	}
+
+	// merge-base --is-ancestor exits 0 when branch is merged into defaultBranch.
+	args := []string{"merge-base", "--is-ancestor", branch, repoInfo.DefaultBranch}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		// Exit status 1 from --is-ancestor means "not merged", not execution error.
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking branch merge status %q into %q: %w: %s", branch, repoInfo.DefaultBranch, err, stderr.String())
+	}
+	return true, nil
+}
+
+// RemoteBranchExists checks if a branch exists on the remote.
+func (c *Client) RemoteBranchExists(ctx context.Context, remote, branch string) (bool, error) {
+	remoteRef := fmt.Sprintf("refs/remotes/%s/%s", remote, branch)
+	args := []string{"rev-parse", "--verify", remoteRef}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		errMsg := stderr.String()
+		if strings.Contains(errMsg, "unknown revision") || strings.Contains(errMsg, "Needed a single revision") {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking remote branch %s/%s: %w", remote, branch, err)
+	}
+	return true, nil
+}
+
+// DeleteRemoteBranch deletes a branch from the remote.
+func (c *Client) DeleteRemoteBranch(ctx context.Context, remote, branch string) error {
+	args := []string{"push", remote, "--delete", branch}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("deleting remote branch %s/%s: %w: %s", remote, branch, err, stderr.String())
+	}
+	return nil
+}
+
 func parseWorktreeOutput(output string) ([]*domain.Worktree, error) {
 	var worktrees []*domain.Worktree
 	currentIndex := -1

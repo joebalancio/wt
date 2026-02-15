@@ -3,36 +3,61 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
+	"github.com/joebalancio/wt/pkg/domain"
 	"github.com/spf13/cobra"
 )
 
 // NewRemoveCmd creates the remove command
 func NewRemoveCmd() *cobra.Command {
-	var force bool
+	var forceStr string
 
 	cmd := &cobra.Command{
-		Use:   "remove <path>",
-		Short: "Remove a worktree",
-		Long: `Remove a worktree from the repository.
+		Use:   "remove [path]",
+		Short: "Remove a worktree and its branch",
+		Long: `Remove a worktree and its associated branch from the repository.
 
-By default, this will fail if the worktree has uncommitted changes.
-Use --force to remove it anyway.`,
-		Args: cobra.ExactArgs(1),
+If no path is provided, resolves the worktree from the current working directory.
+
+By default, this will fail if:
+- The worktree has uncommitted changes
+- The branch is not merged
+
+Use --force to remove anyway (forces local deletion only).
+Use --force=remote to also delete the remote branch.
+
+Force levels:
+  --force         Force local worktree and branch deletion
+  --force=remote  Force local deletion + delete remote branch
+  --force=all     Same as --force=remote`,
+		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			runRemoveCommand(cmd, args[0], force)
+			force, err := domain.ParseForceLevel(forceStr)
+			if err != nil {
+				Fatal("%v", err)
+			}
+
+			path := ""
+			if len(args) > 0 {
+				path = args[0]
+			}
+			runRemoveCommand(cmd, path, force)
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "force removal even with uncommitted changes")
+	cmd.Flags().StringVar(&forceStr, "force", "", "force removal (true, remote, or all)")
+	if flag := cmd.Flags().Lookup("force"); flag != nil {
+		flag.NoOptDefVal = "true"
+	}
 
 	return cmd
 }
 
-func runRemoveCommand(cmd *cobra.Command, path string, force bool) {
+func runRemoveCommand(cmd *cobra.Command, path string, force domain.ForceLevel) {
 	ctx := context.Background()
 
 	gitClient, err := git.NewClient()
@@ -50,20 +75,41 @@ func runRemoveCommand(cmd *cobra.Command, path string, force bool) {
 		Fatal("Failed to create service: %v", err)
 	}
 
-	if err := svc.Remove(ctx, path, force); err != nil {
+	resolvedPath := path
+	if resolvedPath == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			Fatal("Failed to get current directory: %v", err)
+		}
+		wt, err := svc.ResolveFromCWD(ctx, cwd)
+		if err != nil {
+			Fatal("Error: %v. Provide a path: wt remove <path>", err)
+		}
+		resolvedPath = wt.Path
+	}
+
+	branchName := findBranchByPath(ctx, gitClient, resolvedPath)
+	if err := svc.RemoveEnhanced(ctx, resolvedPath, force); err != nil {
 		Fatal("Failed to remove worktree: %v", err)
 	}
 
-	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Removed worktree: %s\n", path); err != nil {
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Removed worktree: %s\n", resolvedPath); err != nil {
 		Fatal("Failed to write output: %v", err)
+	}
+	if branchName != "" {
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Deleted branch: %s\n", branchName); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
 	}
 
 	// Close tmux window if in tmux and window matches
-	closeTmuxWindowForPath(ctx, gitClient, path)
+	if branchName != "" {
+		closeRemoveTmuxWindowForBranch(branchName)
+	}
 }
 
-// closeTmuxWindowForPath closes the tmux window for the given worktree path
-func closeTmuxWindowForPath(ctx context.Context, gitClient *git.Client, path string) {
+// closeRemoveTmuxWindowForBranch closes the tmux window for the given branch.
+func closeRemoveTmuxWindowForBranch(branch string) {
 	if !isInTmux() {
 		return
 	}
@@ -72,14 +118,7 @@ func closeTmuxWindowForPath(ctx context.Context, gitClient *git.Client, path str
 	if err != nil {
 		return
 	}
-
-	// Try to determine branch name from path
-	branchName := findBranchByPath(ctx, gitClient, path)
-	if branchName == "" {
-		return
-	}
-
-	windowName := tmux.GenerateWindowName(branchName)
+	windowName := tmux.GenerateWindowName(branch)
 	// Kill the window if it exists
 	_ = tmuxClient.KillWindow(windowName)
 }
