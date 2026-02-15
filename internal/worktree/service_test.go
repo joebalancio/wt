@@ -423,6 +423,295 @@ func TestService_ResolveFromCWD(t *testing.T) {
 	})
 }
 
+func TestService_RemoveEnhanced(t *testing.T) {
+	t.Run("removes worktree and branch", func(t *testing.T) {
+		var removeCalled, deleteCalled bool
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat-auth", Branch: "feat-auth"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
+				return false, nil
+			},
+			isBranchMergedFunc: func(_ context.Context, _ string) (bool, error) {
+				return true, nil
+			},
+			removeWorktreeFunc: func(_ context.Context, path string, _ bool) error {
+				removeCalled = true
+				if path != "/worktrees/feat-auth" {
+					t.Errorf("unexpected path: %s", path)
+				}
+				return nil
+			},
+			deleteBranchFunc: func(_ context.Context, branch string, _ bool) error {
+				deleteCalled = true
+				if branch != "feat-auth" {
+					t.Errorf("unexpected branch: %s", branch)
+				}
+				return nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/feat-auth", domain.ForceNone)
+		if err != nil {
+			t.Fatalf("RemoveEnhanced() error = %v", err)
+		}
+		if !removeCalled {
+			t.Error("RemoveWorktree was not called")
+		}
+		if !deleteCalled {
+			t.Error("DeleteBranch was not called")
+		}
+	})
+
+	t.Run("fails for default branch", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/repo", domain.ForceNone)
+		if err == nil {
+			t.Fatal("RemoveEnhanced() expected error for default branch, got nil")
+		}
+		if !strings.Contains(err.Error(), "cannot remove default branch") {
+			t.Errorf("expected 'cannot remove default branch' error, got: %v", err)
+		}
+	})
+
+	t.Run("fails for dirty worktree without force", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat", Branch: "feat"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
+				return true, nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/feat", domain.ForceNone)
+		if err == nil {
+			t.Fatal("RemoveEnhanced() expected error for dirty worktree, got nil")
+		}
+		if !strings.Contains(err.Error(), "uncommitted changes") {
+			t.Errorf("expected 'uncommitted changes' error, got: %v", err)
+		}
+	})
+
+	t.Run("removes dirty worktree with force", func(t *testing.T) {
+		var removeCalled, deleteCalled bool
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat", Branch: "feat"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
+				return true, nil
+			},
+			isBranchMergedFunc: func(_ context.Context, _ string) (bool, error) {
+				return true, nil
+			},
+			removeWorktreeFunc: func(_ context.Context, _ string, force bool) error {
+				removeCalled = true
+				if !force {
+					t.Error("expected forced remove")
+				}
+				return nil
+			},
+			deleteBranchFunc: func(_ context.Context, _ string, force bool) error {
+				deleteCalled = true
+				if !force {
+					t.Error("expected forced branch delete")
+				}
+				return nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/feat", domain.ForceLocal)
+		if err != nil {
+			t.Fatalf("RemoveEnhanced() error = %v", err)
+		}
+		if !removeCalled {
+			t.Error("RemoveWorktree was not called")
+		}
+		if !deleteCalled {
+			t.Error("DeleteBranch was not called")
+		}
+	})
+
+	t.Run("fails for unmerged branch without force", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat", Branch: "feat"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
+				return false, nil
+			},
+			isBranchMergedFunc: func(_ context.Context, _ string) (bool, error) {
+				return false, nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/feat", domain.ForceNone)
+		if err == nil {
+			t.Fatal("RemoveEnhanced() expected error for unmerged branch, got nil")
+		}
+		if !strings.Contains(err.Error(), "not merged") {
+			t.Errorf("expected 'not merged' error, got: %v", err)
+		}
+	})
+
+	t.Run("deletes remote branch with ForceRemote", func(t *testing.T) {
+		var deleteRemoteCalled bool
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat", Branch: "feat"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
+				return false, nil
+			},
+			isBranchMergedFunc: func(_ context.Context, _ string) (bool, error) {
+				return true, nil
+			},
+			remoteBranchExistsFunc: func(_ context.Context, remote, branch string) (bool, error) {
+				if remote != "origin" || branch != "feat" {
+					t.Errorf("unexpected remote/branch: %s/%s", remote, branch)
+				}
+				return true, nil
+			},
+			deleteRemoteBranchFunc: func(_ context.Context, remote, branch string) error {
+				deleteRemoteCalled = true
+				if remote != "origin" || branch != "feat" {
+					t.Errorf("unexpected remote/branch: %s/%s", remote, branch)
+				}
+				return nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/feat", domain.ForceRemote)
+		if err != nil {
+			t.Fatalf("RemoveEnhanced() error = %v", err)
+		}
+		if !deleteRemoteCalled {
+			t.Error("DeleteRemoteBranch was not called")
+		}
+	})
+
+	t.Run("detached HEAD worktree returns error", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main", Head: "abc"},
+					{Path: "/worktrees/detached", Branch: "", Head: "123456"},
+				}, nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/detached", domain.ForceNone)
+		if err == nil {
+			t.Fatal("RemoveEnhanced() expected error for detached HEAD, got nil")
+		}
+		if !strings.Contains(err.Error(), "detached HEAD") {
+			t.Errorf("expected 'detached HEAD' error, got: %v", err)
+		}
+	})
+
+	t.Run("non-existent worktree path returns error", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat", Branch: "feat"},
+				}, nil
+			},
+		}
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/nonexistent/path", domain.ForceNone)
+		if err == nil {
+			t.Fatal("RemoveEnhanced() expected error for non-existent worktree, got nil")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("expected 'not found' error, got: %v", err)
+		}
+	})
+}
+
 func TestService_Done(t *testing.T) {
 	t.Run("successful done workflow", func(t *testing.T) {
 		mergeCalled := false

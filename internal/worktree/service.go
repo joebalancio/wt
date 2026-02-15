@@ -146,6 +146,76 @@ func (s *Service) ResolveFromCWD(ctx context.Context, cwd string) (*domain.Workt
 	return bestMatch, nil
 }
 
+// RemoveEnhanced removes a worktree and its associated branch with safety checks.
+func (s *Service) RemoveEnhanced(ctx context.Context, path string, force domain.ForceLevel) error {
+	if path == "" {
+		return fmt.Errorf("path is required")
+	}
+
+	worktrees, err := s.git.ListWorktrees(ctx)
+	if err != nil {
+		return fmt.Errorf("listing worktrees: %w", err)
+	}
+
+	var targetWorktree *domain.Worktree
+	for _, wt := range worktrees {
+		if wt.Path == path {
+			targetWorktree = wt
+			break
+		}
+	}
+	if targetWorktree == nil {
+		return fmt.Errorf("worktree at %q not found", path)
+	}
+	if targetWorktree.Detached() {
+		return errors.New("cannot remove: detached HEAD (no branch)")
+	}
+
+	repoInfo, err := s.git.GetRepoInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("getting repo info: %w", err)
+	}
+	if targetWorktree.Branch == repoInfo.DefaultBranch {
+		return fmt.Errorf("cannot remove default branch %q", targetWorktree.Branch)
+	}
+
+	dirty, err := s.git.IsWorktreeDirty(ctx, path)
+	if err != nil {
+		return fmt.Errorf("checking worktree status: %w", err)
+	}
+	if dirty && force == domain.ForceNone {
+		return errors.New("worktree has uncommitted changes. Use --force to remove anyway")
+	}
+
+	merged, err := s.git.IsBranchMerged(ctx, targetWorktree.Branch)
+	if err != nil {
+		return fmt.Errorf("checking branch merge status: %w", err)
+	}
+	if !merged && force == domain.ForceNone {
+		return fmt.Errorf("branch %q is not merged. Use --force to delete anyway", targetWorktree.Branch)
+	}
+
+	forceRemove := force != domain.ForceNone
+	if err := s.git.RemoveWorktree(ctx, path, forceRemove); err != nil {
+		return fmt.Errorf("removing worktree: %w", err)
+	}
+
+	if err := s.git.DeleteBranch(ctx, targetWorktree.Branch, true); err != nil {
+		return fmt.Errorf("deleting branch: %w", err)
+	}
+
+	if force == domain.ForceRemote {
+		remoteExists, err := s.git.RemoteBranchExists(ctx, "origin", targetWorktree.Branch)
+		if err == nil && remoteExists {
+			if err := s.git.DeleteRemoteBranch(ctx, "origin", targetWorktree.Branch); err != nil {
+				return fmt.Errorf("deleting remote branch: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Done completes a worktree by merging it, creating a commit, and removing it
 func (s *Service) Done(ctx context.Context, worktreePath, branch string, force bool) error {
 	// Validate branch exists
