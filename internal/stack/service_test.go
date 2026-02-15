@@ -369,6 +369,18 @@ func (m *MockGitClient) IsWorktreeDirty(_ context.Context, _ string) (bool, erro
 	return false, nil
 }
 
+func (m *MockGitClient) IsBranchMerged(_ context.Context, _ string) (bool, error) {
+	return true, nil
+}
+
+func (m *MockGitClient) RemoteBranchExists(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockGitClient) DeleteRemoteBranch(_ context.Context, _, _ string) error {
+	return nil
+}
+
 // MockSpiceClient is a mock implementation of SpiceClient for testing
 type MockSpiceClient struct {
 	createFunc func(context.Context, spice.BranchCreateSpec) (*spice.Branch, error)

@@ -264,23 +264,19 @@ func (c *Client) IsBranchMerged(ctx context.Context, branch string) (bool, error
 		return false, fmt.Errorf("getting repo info: %w", err)
 	}
 
-	args := []string{"branch", "--merged", repoInfo.DefaultBranch}
-	var stdout, stderr bytes.Buffer
+	// merge-base --is-ancestor exits 0 when branch is merged into defaultBranch.
+	args := []string{"merge-base", "--is-ancestor", branch, repoInfo.DefaultBranch}
+	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, c.gitPath, args...)
-	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return false, fmt.Errorf("checking merged branches: %w: %s", err, stderr.String())
-	}
-
-	for _, merged := range strings.Split(stdout.String(), "\n") {
-		cleaned := strings.TrimSpace(strings.TrimPrefix(merged, "*"))
-		if cleaned == branch {
-			return true, nil
+		// Exit status 1 from --is-ancestor means "not merged", not execution error.
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return false, nil
 		}
+		return false, fmt.Errorf("checking branch merge status %q into %q: %w: %s", branch, repoInfo.DefaultBranch, err, stderr.String())
 	}
-
-	return false, nil
+	return true, nil
 }
 
 // RemoteBranchExists checks if a branch exists on the remote.

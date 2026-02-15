@@ -157,42 +157,31 @@ func (s *Service) RemoveEnhanced(ctx context.Context, path string, force domain.
 		return fmt.Errorf("listing worktrees: %w", err)
 	}
 
-	var targetWorktree *domain.Worktree
-	for _, wt := range worktrees {
-		if wt.Path == path {
-			targetWorktree = wt
-			break
-		}
-	}
-	if targetWorktree == nil {
-		return fmt.Errorf("worktree at %q not found", path)
-	}
-	if targetWorktree.Detached() {
-		return errors.New("cannot remove: detached HEAD (no branch)")
+	targetWorktree, err := findWorktreeByPath(worktrees, path)
+	if err != nil {
+		return err
 	}
 
 	repoInfo, err := s.git.GetRepoInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("getting repo info: %w", err)
 	}
-	if targetWorktree.Branch == repoInfo.DefaultBranch {
-		return fmt.Errorf("cannot remove default branch %q", targetWorktree.Branch)
+	if err := s.validateRemoveSafety(ctx, targetWorktree, path, repoInfo.DefaultBranch, force); err != nil {
+		return err
 	}
 
-	dirty, err := s.git.IsWorktreeDirty(ctx, path)
-	if err != nil {
-		return fmt.Errorf("checking worktree status: %w", err)
-	}
-	if dirty && force == domain.ForceNone {
-		return errors.New("worktree has uncommitted changes. Use --force to remove anyway")
+	safeDir := repoInfo.RootPath
+	if samePathOrSubpath(safeDir, path) {
+		for _, wt := range worktrees {
+			if wt.Path != path && !samePathOrSubpath(wt.Path, path) {
+				safeDir = wt.Path
+				break
+			}
+		}
 	}
 
-	merged, err := s.git.IsBranchMerged(ctx, targetWorktree.Branch)
-	if err != nil {
-		return fmt.Errorf("checking branch merge status: %w", err)
-	}
-	if !merged && force == domain.ForceNone {
-		return fmt.Errorf("branch %q is not merged. Use --force to delete anyway", targetWorktree.Branch)
+	if err := chdirIfInsidePath(path, safeDir); err != nil {
+		return err
 	}
 
 	forceRemove := force != domain.ForceNone
@@ -204,16 +193,97 @@ func (s *Service) RemoveEnhanced(ctx context.Context, path string, force domain.
 		return fmt.Errorf("deleting branch: %w", err)
 	}
 
-	if force == domain.ForceRemote {
-		remoteExists, err := s.git.RemoteBranchExists(ctx, "origin", targetWorktree.Branch)
-		if err == nil && remoteExists {
-			if err := s.git.DeleteRemoteBranch(ctx, "origin", targetWorktree.Branch); err != nil {
-				return fmt.Errorf("deleting remote branch: %w", err)
+	return s.deleteRemoteBranchIfRequested(ctx, force, targetWorktree.Branch)
+}
+
+func findWorktreeByPath(worktrees []*domain.Worktree, path string) (*domain.Worktree, error) {
+	for _, wt := range worktrees {
+		if wt.Path == path {
+			if wt.Detached() {
+				return nil, errors.New("cannot remove: detached HEAD (no branch)")
 			}
+			return wt, nil
 		}
 	}
+	return nil, fmt.Errorf("worktree at %q not found", path)
+}
 
+func (s *Service) validateRemoveSafety(ctx context.Context, target *domain.Worktree, path, defaultBranch string, force domain.ForceLevel) error {
+	if target.Branch == defaultBranch {
+		return fmt.Errorf("cannot remove default branch %q", target.Branch)
+	}
+
+	dirty, err := s.git.IsWorktreeDirty(ctx, path)
+	if err != nil {
+		return fmt.Errorf("checking worktree status: %w", err)
+	}
+	if dirty && force == domain.ForceNone {
+		return errors.New("worktree has uncommitted changes. Use --force to remove anyway")
+	}
+
+	merged, err := s.git.IsBranchMerged(ctx, target.Branch)
+	if err != nil {
+		return fmt.Errorf("checking branch merge status: %w", err)
+	}
+	if !merged && force == domain.ForceNone {
+		return fmt.Errorf("branch %q is not merged. Use --force to delete anyway", target.Branch)
+	}
 	return nil
+}
+
+func chdirIfInsidePath(targetPath, safeDir string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+
+	cwdAbs, cwdErr := filepath.Abs(cwd)
+	pathAbs, pathErr := filepath.Abs(targetPath)
+	if cwdErr != nil || pathErr != nil {
+		return nil
+	}
+
+	rel, relErr := filepath.Rel(pathAbs, cwdAbs)
+	if relErr != nil {
+		return nil
+	}
+
+	inside := rel == "." || (!strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != "..")
+	if inside {
+		if err := os.Chdir(safeDir); err != nil {
+			return fmt.Errorf("changing directory to safe location: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *Service) deleteRemoteBranchIfRequested(ctx context.Context, force domain.ForceLevel, branch string) error {
+	if force != domain.ForceRemote {
+		return nil
+	}
+
+	remoteExists, err := s.git.RemoteBranchExists(ctx, "origin", branch)
+	if err != nil || !remoteExists {
+		return nil
+	}
+
+	if err := s.git.DeleteRemoteBranch(ctx, "origin", branch); err != nil {
+		return fmt.Errorf("deleting remote branch: %w", err)
+	}
+	return nil
+}
+
+func samePathOrSubpath(candidatePath, targetPath string) bool {
+	candidateAbs, cErr := filepath.Abs(candidatePath)
+	targetAbs, tErr := filepath.Abs(targetPath)
+	if cErr != nil || tErr != nil {
+		return candidatePath == targetPath
+	}
+	rel, err := filepath.Rel(targetAbs, candidateAbs)
+	if err != nil {
+		return candidateAbs == targetAbs
+	}
+	return rel == "." || rel == "" || (!strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != "..")
 }
 
 // Done completes a worktree by merging it, creating a commit, and removing it
