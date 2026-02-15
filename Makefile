@@ -78,7 +78,12 @@ build:
 build-release:
 	@echo "Building release binaries..."
 	@mkdir -p $(BUILD_DIR)
-	@gox -osarch="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64" -output "$(BUILD_DIR)/$(BINARY_NAME)_{{.OS}}_{{.Arch}}" ./$(CMD_DIR)
+	@for osarch in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
+		echo "Building for $$osarch..."; \
+		GOOS=$${osarch%/*} GOARCH=$${osarch#*/} \
+			$(GO) build $(GOFLAGS) -o "$(BUILD_DIR)/$(BINARY_NAME)_$${osarch%/*}_$${osarch#*/}" ./$(CMD_DIR) || exit 1; \
+	done
+	@echo "Release binaries built in $(BUILD_DIR)/"
 
 ## install: Install the binary to GOPATH/bin
 install:
@@ -105,6 +110,5 @@ precommit: fmt lint test
 tools:
 	@echo "Installing development tools..."
 	@curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $$(go env GOPATH)/bin
-	@$(GO) install github.com/mitchellh/gox@latest
 	@$(GO) install mvdan.cc/gofumpt@latest
 	@echo "Tools installed successfully!"
