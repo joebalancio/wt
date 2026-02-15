@@ -151,15 +151,16 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 }
 
 func checkConfiguration(out io.Writer) bool {
-	// Find project and global configs
-	projectPath, globalPath, err := config.FindConfigs("")
+	customPath, _ := rootCmd.PersistentFlags().GetString("config")
+
+	projectPath, globalPath, err := config.FindConfigs(customPath)
 	if err != nil {
-		fmt.Fprintf(out, "! No configuration file found\n")
-		fmt.Fprintf(out, "  Run 'wt init' to create default config\n")
+		fmt.Fprintln(out, "! No configuration file found")
+		fmt.Fprintln(out, "  Run 'wt config set <key> <value>' to create one")
 		return false
 	}
 
-	// Report which configs are active
+	// Show which configs are active
 	if projectPath != "" {
 		fmt.Fprintf(out, "✓ Project config: %s\n", projectPath)
 	}
@@ -174,21 +175,9 @@ func checkConfiguration(out io.Writer) bool {
 		return false
 	}
 
-	fmt.Fprintf(out, "✓ Config is valid YAML\n")
-
-	// Check worktree location
-	location := cfg.Worktree.Location
-	if location == "" {
-		location = "per-repo"
-	}
-	if location == "dedicated" {
-		dedicatedPath := cfg.Worktree.DedicatedPath
-		if dedicatedPath == "" {
-			dedicatedPath = "~/worktrees"
-		}
-		fmt.Fprintf(out, "✓ Worktree location: dedicated (%s)\n", dedicatedPath)
-	} else {
-		fmt.Fprintf(out, "✓ Worktree location: per-repo\n")
+	if err := cfg.ValidateSchema(); err != nil {
+		fmt.Fprintf(out, "! Config schema error: %v\n", err)
+		return false
 	}
 
 	return true
