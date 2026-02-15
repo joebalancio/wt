@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -138,5 +139,140 @@ func runGitCommand(t *testing.T, dir string, args ...string) {
 	cmd.Dir = dir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %s failed: %v\nOutput: %s", strings.Join(args, " "), err, output)
+	}
+}
+
+func TestFindConfigs(t *testing.T) {
+	tests := []struct {
+		name        string
+		customPath  string
+		setupFunc   func(t *testing.T, dir string) (globalPath string)
+		wantProject bool
+		wantGlobal  bool
+		wantErr     bool
+	}{
+		{
+			name:       "custom path skips discovery",
+			customPath: "/custom/config.yaml",
+			setupFunc: func(t *testing.T, dir string) string {
+				runGitCommand(t, dir, "init")
+				// Set HOME to temp dir to avoid finding real global config
+				os.Setenv("HOME", dir)
+				return ""
+			},
+			wantProject: false,
+			wantGlobal:  false,
+			wantErr:     true, // custom path doesn't exist
+		},
+		{
+			name: "project config only at git root",
+			setupFunc: func(t *testing.T, dir string) string {
+				runGitCommand(t, dir, "init")
+				runGitCommand(t, dir, "config", "user.email", "test@test.com")
+				runGitCommand(t, dir, "config", "user.name", "Test")
+				// Create .wt.yaml at root
+				if err := os.WriteFile(filepath.Join(dir, ".wt.yaml"), []byte("tmux:\n  layout: test\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				// Set HOME to temp dir (no global config there)
+				os.Setenv("HOME", dir)
+				return ""
+			},
+			wantProject: true,
+			wantGlobal:  false,
+			wantErr:     false,
+		},
+		{
+			name: "global config only (not in git repo)",
+			setupFunc: func(_ *testing.T, dir string) string {
+				// Create global config in temp location
+				globalDir := filepath.Join(dir, ".config", "wt")
+				os.MkdirAll(globalDir, 0755)
+				globalPath := filepath.Join(globalDir, "config.yaml")
+				os.WriteFile(globalPath, []byte("tmux:\n  layout: global\n"), 0644)
+				// Set XDG_CONFIG_HOME equivalent via HOME
+				os.Setenv("HOME", dir)
+				return globalPath
+			},
+			wantProject: false,
+			wantGlobal:  true,
+			wantErr:     false,
+		},
+		{
+			name: "both project and global configs",
+			setupFunc: func(t *testing.T, dir string) string {
+				runGitCommand(t, dir, "init")
+				runGitCommand(t, dir, "config", "user.email", "test@test.com")
+				runGitCommand(t, dir, "config", "user.name", "Test")
+				// Project config
+				os.WriteFile(filepath.Join(dir, ".wt.yaml"), []byte("tmux:\n  layout: project\n"), 0644)
+				// Global config
+				globalDir := filepath.Join(dir, ".config", "wt")
+				os.MkdirAll(globalDir, 0755)
+				globalPath := filepath.Join(globalDir, "config.yaml")
+				os.WriteFile(globalPath, []byte("tmux:\n  layout: global\n"), 0644)
+				os.Setenv("HOME", dir)
+				return globalPath
+			},
+			wantProject: true,
+			wantGlobal:  true,
+			wantErr:     false,
+		},
+		{
+			name: "no configs found",
+			setupFunc: func(_ *testing.T, dir string) string {
+				// Not in git repo, no global config
+				os.Setenv("HOME", dir) // HOME points to empty dir
+				return ""
+			},
+			wantProject: false,
+			wantGlobal:  false,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+
+			// Save original HOME
+			origHome := os.Getenv("HOME")
+			defer os.Setenv("HOME", origHome)
+
+			// Setup
+			_ = tt.setupFunc(t, tempDir)
+
+			// Change to temp dir
+			originalWd, _ := os.Getwd()
+			defer os.Chdir(originalWd)
+			os.Chdir(tempDir)
+
+			projectPath, globalPath, err := FindConfigs(tt.customPath)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("FindConfigs() expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("FindConfigs() unexpected error: %v", err)
+				return
+			}
+
+			if tt.wantProject && projectPath == "" {
+				t.Error("FindConfigs() expected project path, got empty")
+			}
+			if !tt.wantProject && projectPath != "" {
+				t.Errorf("FindConfigs() expected no project path, got %q", projectPath)
+			}
+			if tt.wantGlobal && globalPath == "" {
+				t.Error("FindConfigs() expected global path, got empty")
+			}
+			if !tt.wantGlobal && globalPath != "" {
+				t.Errorf("FindConfigs() expected no global path, got %q", globalPath)
+			}
+		})
 	}
 }

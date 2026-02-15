@@ -198,3 +198,42 @@ func FindGitRoot() (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
+
+// FindConfigs discovers project and global config paths
+// projectPath: .wt.yaml at Git root (may be "")
+// globalPath: ~/.config/wt/config.yaml (may be "")
+// Returns error only if neither config exists
+func FindConfigs(customPath string) (projectPath, globalPath string, err error) {
+	// If custom path provided, use it exclusively
+	if customPath != "" {
+		if _, statErr := os.Stat(customPath); statErr != nil {
+			return "", "", fmt.Errorf("custom config path not found: %w", statErr)
+		}
+		return customPath, "", nil
+	}
+
+	// Try to find project config at Git root
+	gitRoot, gitErr := FindGitRoot()
+	if gitErr == nil {
+		candidateProject := filepath.Join(gitRoot, ".wt.yaml")
+		if _, statErr := os.Stat(candidateProject); statErr == nil {
+			projectPath = candidateProject
+		}
+	}
+
+	// Check for global config
+	home, homeErr := os.UserHomeDir()
+	if homeErr == nil {
+		candidateGlobal := filepath.Join(home, ".config", "wt", "config.yaml")
+		if _, statErr := os.Stat(candidateGlobal); statErr == nil {
+			globalPath = candidateGlobal
+		}
+	}
+
+	// Return error only if no configs found
+	if projectPath == "" && globalPath == "" {
+		return "", "", fmt.Errorf("no configuration file found")
+	}
+
+	return projectPath, globalPath, nil
+}
