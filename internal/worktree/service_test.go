@@ -15,16 +15,16 @@ var _ git.GitClient = (*mockGitClient)(nil)
 
 // mockGitClient is a simple mock for testing
 type mockGitClient struct {
-	listWorktreesFunc     func(ctx context.Context) ([]*domain.Worktree, error)
-	addWorktreeFunc       func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error)
-	removeWorktreeFunc    func(ctx context.Context, path string, force bool) error
-	getRepoInfoFunc       func(ctx context.Context) (*domain.GitRepo, error)
-	branchExistsFunc      func(ctx context.Context, branch string) (bool, error)
-	getCurrentBranchFunc  func(ctx context.Context) (string, error)
-	deleteBranchFunc      func(ctx context.Context, branch string, force bool) error
-	squashMergeFunc       func(ctx context.Context, sourceBranch string) error
+	listWorktreesFunc      func(ctx context.Context) ([]*domain.Worktree, error)
+	addWorktreeFunc        func(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error)
+	removeWorktreeFunc     func(ctx context.Context, path string, force bool) error
+	getRepoInfoFunc        func(ctx context.Context) (*domain.GitRepo, error)
+	branchExistsFunc       func(ctx context.Context, branch string) (bool, error)
+	getCurrentBranchFunc   func(ctx context.Context) (string, error)
+	deleteBranchFunc       func(ctx context.Context, branch string, force bool) error
+	squashMergeFunc        func(ctx context.Context, sourceBranch string) error
 	createSquashCommitFunc func(ctx context.Context, message string) error
-	isWorktreeDirtyFunc   func(ctx context.Context, path string) (bool, error)
+	isWorktreeDirtyFunc    func(ctx context.Context, path string) (bool, error)
 }
 
 func (m *mockGitClient) ListWorktrees(ctx context.Context) ([]*domain.Worktree, error) {
