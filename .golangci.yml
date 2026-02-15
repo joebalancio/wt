@@ -9,14 +9,6 @@ run:
   # Include test files
   tests: true
 
-output:
-  # Print lines of code with issue
-  print-issued-lines: true
-  # Print linter name in the end of issue text
-  print-linter-name: true
-  # Sort results by: filepath, line and column
-  sort-results: true
-
 linters:
   # Use none as default to explicitly enable linters
   default: none
@@ -39,6 +31,21 @@ linters:
 
     # Performance
     - prealloc        # Find slice declarations that could potentially be preallocated
+
+  # Exclusions (replaces issues.exclude-rules, exclude-dirs, exclude-files)
+  exclusions:
+    # Exclude some linters from running on test files
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - gocognit
+          - errcheck
+    # Directories to exclude from analysis
+    paths:
+      - vendor
+      - bin
+      - ".*\\.pb\\.go$"
 
   settings:
     errcheck:
@@ -110,22 +117,5 @@ issues:
   max-issues-per-linter: 0
   # Maximum count of issues with the same text
   max-same-issues: 0
-  # Show only new issues
-  new: false
   # Make issues output unique by line
   uniq-by-line: true
-  # Directories to exclude from analysis
-  exclude-dirs:
-    - vendor
-    - bin
-  # Files to exclude from analysis
-  exclude-files:
-    - ".*\\.pb\\.go$"
-  # Exclude specific issues
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - gocognit
-        - errcheck
