@@ -200,7 +200,6 @@ make tools
 
 # Or install individually:
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-go install github.com/cosmtrek/air@latest
 go install mvdan.cc/gofumpt@latest
 ```
 
@@ -221,9 +220,6 @@ make test-cover
 
 # Build the binary
 make build
-
-# Run with hot-reload
-make dev
 
 # Run all checks
 make check

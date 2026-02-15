@@ -57,11 +57,10 @@ make lint-fix              # Run linters with auto-fix
 make fmt                   # Format code (go fmt + gofumpt if available)
 
 # Development workflow
-make dev                   # Hot-reload development (requires air)
 make check                 # Run all checks: fmt + lint + test
 
 # Install development tools
-make tools                 # Install golangci-lint, air, gofumpt, gox
+make tools                 # Install golangci-lint, gofumpt, gox
 
 # Other useful commands
 make test-cover            # Generate coverage report (opens in browser)

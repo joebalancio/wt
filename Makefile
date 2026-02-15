@@ -1,6 +1,6 @@
 # Makefile for wt - AI-friendly development commands
 
-.PHONY: help build test test-unit test-integration test-all lint clean fmt install deps dev run
+.PHONY: help build test test-unit test-integration test-all lint clean fmt install deps run
 
 # Variables
 BINARY_NAME=wt
@@ -91,14 +91,6 @@ clean:
 	@rm -f coverage.out
 	@$(GO) clean
 
-## dev: Run with hot-reload (requires air)
-dev:
-	@if ! command -v air >/dev/null 2>&1; then \
-		echo "air not installed. Run: go install github.com/cosmtrek/air@latest"; \
-		exit 1; \
-	fi
-	air
-
 ## run: Build and run once
 run: build
 	./$(BUILD_DIR)/$(BINARY_NAME) --help
@@ -113,9 +105,6 @@ precommit: fmt lint test
 tools:
 	@echo "Installing development tools..."
 	@$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@$(GO) install github.com/cosmtrek/air@latest
 	@$(GO) install github.com/mitchellh/gox@latest
-	@if command -v gofumpt >/dev/null 2>&1; then \
-		$(GO) install mvdan.cc/gofumpt@latest; \
-	fi
+	@$(GO) install mvdan.cc/gofumpt@latest
 	@echo "Tools installed successfully!"
