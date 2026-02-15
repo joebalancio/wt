@@ -1,6 +1,6 @@
 # Makefile for wt - AI-friendly development commands
 
-.PHONY: help build test test-unit test-integration test-all lint clean fmt install deps run
+.PHONY: help build build-release test test-unit test-verbose test-integration test-all test-cover lint lint-fix clean fmt install deps run check precommit tools
 
 # Variables
 BINARY_NAME=wt
