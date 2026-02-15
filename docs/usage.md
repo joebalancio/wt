@@ -163,11 +163,23 @@ wt remove /path/to/worktree --force
 
 ## Configuration
 
-wt uses YAML configuration files that are searched in the following order:
+wt uses YAML configuration files with a layered approach:
 
-1. Path specified by `--config` flag
-2. `.wt.yaml` in the current directory
-3. `~/.config/wt/config.yaml` (XDG standard location)
+### Configuration Discovery (v3)
+
+Configs are loaded and merged in this order:
+
+1. `--config` flag value (single config, no merging)
+2. `.wt.yaml` at Git root (project-local, merges with global)
+3. `~/.config/wt/config.yaml` (user-global, XDG standard)
+
+**Merge semantics when both project and global configs exist:**
+- Project config overlays global config
+- Scalars (strings, bools, numbers): project value wins
+- Arrays (hooks): project array replaces global entirely
+- Undefined fields: inherit from global
+
+This allows team-wide defaults in `~/.config/wt/config.yaml` with project-specific overrides in `.wt.yaml` at the repository root.
 
 ### Configuration Options
 
