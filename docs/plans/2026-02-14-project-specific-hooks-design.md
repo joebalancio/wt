@@ -1,61 +1,271 @@
-# Project-Specific Hooks Design
+# Project-Local Configuration Design
 
-**Goal:** To allow users to define project-specific hooks in their `wt` configuration that are triggered based on the path of the worktree. This applies to all hook types: `on_worktree_create`, `on_worktree_remove`, and `on_worktree_done`.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Architecture:** The implementation will modify the hook execution logic in `pkg/executor/hook_runner.go`. It will introduce logic to check for and apply matching project overrides from the configuration before executing any hook type. No new packages or dependencies are required.
+**Goal:** Enable project-local `.wt.yaml` configuration that layers on top of global config, with Git root discovery and array replacement semantics. This replaces the previous `project_overrides` design.
 
-**Configuration Schema:** See `configs/example.yaml` for the full structure. The relevant section:
+**Architecture:** Config discovery traverses to Git root using `git rev-parse --show-toplevel` to find `.wt.yaml`. Global config is loaded first, then project config is overlaid using YAML unmarshaling (last-write-wins). Arrays replace entirely, undefined fields inherit from global.
 
-```yaml
-project_overrides:
-  - match: "**/*rust*"        # Glob pattern matched against worktree path
-    hooks:
-      on_worktree_create:
-        - run: "cargo fetch"
-          cwd: "{worktree_path}"
-      on_worktree_remove:
-        - run: "rm -rf target"
-          cwd: "{worktree_path}"
+**Tech Stack:** Go 1.21+, `yaml.v3` for overlay merging, existing git client for root discovery
+
+---
+
+## Precedence Hierarchy
+
+```
+Highest Priority (most specific):
+  ↓ .wt.yaml at Git root (project-local, version controlled)
+  ↓ ~/.config/wt/config.yaml (user-global)
+Lowest Priority (least specific):
 ```
 
-**Data Flow:**
+**Merge Semantics:**
+- **Scalars (strings, bools, numbers)**: Project value replaces global value
+- **Arrays (hooks)**: Project array replaces global array entirely
+- **Undefined fields**: Keep global value (inherit)
 
-1. A hook-triggering command is executed (`wt add`, `wt remove`, or `wt done`).
-2. The `HookRunner` is invoked with the hook type and `worktreePath`.
-3. Inside `HookRunner.Run()`:
-    a. The `wt` configuration is loaded.
-    b. A new list `hooksToRun` is initialized with the global hooks for the current hook type (e.g., `cfg.Hooks.OnWorktreeCreate`).
-    c. The function iterates through each `override` in `cfg.ProjectOverrides`.
-    d. For each `override`, `filepath.Match(override.Match, worktreePath)` checks if the glob pattern matches the worktree's absolute path.
-    e. If a match is found, the hooks for the current hook type from `override.Hooks` are **appended** to `hooksToRun`.
-    f. **All matching overrides are applied** (not just the first match).
-    g. The final `hooksToRun` list is executed sequentially.
-4. Each hook is executed with template variables expanded (e.g., `{worktree_path}`).
+---
 
-**Error Handling:**
+## Configuration Schema
 
-*   **Runtime glob errors:** If `filepath.Match` returns an error (due to a malformed glob pattern), the error will be logged as a warning, and the process will continue without applying that specific override.
-*   **Config validation:** Glob pattern validity is checked at config load time by `config.ValidateSchema()`. Malformed patterns (e.g., `**/[`) will cause `wt config validate` to fail with a descriptive error.
-*   **Hook execution errors:** Continue to be handled by the existing `HookRunner`, which reports them as warnings without halting the command.
+Project config (`.wt.yaml` at Git root) uses the same schema as global config:
 
-**Implementation Changes:**
+```yaml
+# .wt.yaml (committed to repo for team sharing)
+hooks:
+  on_worktree_create:
+    - run: "cargo fetch"
+      cwd: "{worktree_path}"
+  on_worktree_remove:
+    - run: "rm -rf target"
+      cwd: "{worktree_path}"
 
-1. `internal/config/config.go`:
-   - Add `ProjectOverrides []ProjectOverride` to `Config` struct
-   - Add `ValidateSchema()` check for glob pattern validity using `filepath.Match` with empty string
-   - Update `ProjectOverride` struct with `Match string` and `Hooks HooksConfig`
+tmux:
+  layout: "main-vertical"
+  attach_on_create: false
 
-2. `pkg/executor/hook_runner.go`:
-   - Modify `Run()` to accept config and iterate over `ProjectOverrides`
-   - Apply matching override hooks to all hook types
+worktree:
+  location: "per-repo"
+```
 
-**Testing Plan:** Integration tests will verify:
+Global config (`~/.config/wt/config.yaml`) provides defaults:
 
-| Test Case | Description |
-|-----------|-------------|
-| Global + Override | Both global and matching override hooks run in append order |
-| Multiple Matches | All matching overrides apply, not just the first |
-| All Hook Types | Overrides work for `create`, `remove`, and `done` hooks |
-| Glob Validation | Malformed pattern fails `wt config validate` |
-| No Match | Non-matching override does not apply hooks |
-| Empty Overrides | Empty `project_overrides` list works correctly |
+```yaml
+# Global defaults
+hooks:
+  on_worktree_create:
+    - run: "npm install"
+      cwd: "{worktree_path}"
+
+tmux:
+  layout: "main-vertical"
+  attach_on_create: true
+```
+
+**Result when both exist:**
+```yaml
+hooks:
+  on_worktree_create:
+    - run: "cargo fetch"        # Project replaces global
+tmux:
+  layout: "main-vertical"        # Inherited (undefined in project)
+  attach_on_create: false        # Project overrides global
+worktree:
+  location: "per-repo"           # From project
+```
+
+---
+
+## Config Discovery
+
+### Current Behavior
+```go
+// FindConfig checks: --config flag → .wt.yaml (cwd) → ~/.config/wt/config.yaml
+// Returns: single config path
+```
+
+### New Behavior
+```go
+// FindConfigs returns project and global config paths
+// projectPath: .wt.yaml at Git root (may be "")
+// globalPath: ~/.config/wt/config.yaml (may be "")
+func FindConfigs(customPath string) (projectPath, globalPath string, err error)
+```
+
+**Discovery Algorithm:**
+```
+1. If --config flag provided → use explicit path, skip merging
+2. Run git rev-parse --show-toplevel to find Git root
+   - If not in Git repo → projectPath = ""
+   - If Git root found → check for .wt.yaml at root
+3. Check ~/.config/wt/config.yaml for global config
+4. Return (projectPath, globalPath)
+```
+
+**Worktree Behavior:**
+- When running `wt` from a worktree, `git rev-parse --show-toplevel` returns the worktree directory
+- `.wt.yaml` is committed to the repo, so every worktree has it at its root
+- Each worktree gets the same project config (team sharing works automatically)
+
+**Example:**
+```
+Directory: /home/user/projects/myrepo/.worktrees/mobile/src/
+git rev-parse --show-toplevel → /home/user/projects/myrepo/.worktrees/mobile/
+Config found: /home/user/projects/myrepo/.worktrees/mobile/.wt.yaml
+```
+
+---
+
+## Config Merging
+
+### Implementation (YAML Overlay)
+
+```go
+func LoadMerged(projectPath, globalPath string) (*Config, error) {
+    cfg := DefaultConfig()
+
+    // Load global config (if exists)
+    if globalPath != "" {
+        data, err := os.ReadFile(globalPath)
+        if err != nil {
+            return nil, fmt.Errorf("reading global config: %w", err)
+        }
+        if err := yaml.Unmarshal(data, cfg); err != nil {
+            return nil, fmt.Errorf("parsing global config: %w", err)
+        }
+    }
+
+    // Overlay project config (if exists)
+    if projectPath != "" {
+        data, err := os.ReadFile(projectPath)
+        if err != nil {
+            return nil, fmt.Errorf("reading project config: %w", err)
+        }
+        if err := yaml.Unmarshal(data, cfg); err != nil {
+            return nil, fmt.Errorf("parsing project config: %w", err)
+        }
+    }
+
+    return cfg, nil
+}
+```
+
+### Merge Semantics (via yaml.v3)
+
+YAML unmarshaling to the same struct naturally implements "last write wins":
+- Fields defined in project YAML overwrite global values
+- Fields undefined in project YAML retain global values
+- Arrays are replaced entirely (not merged)
+
+---
+
+## Data Flow
+
+```
+User runs: wt add feature-branch
+    ↓
+FindConfigs() discovers:
+    - projectPath: /repo/.wt.yaml (from git rev-parse --show-toplevel)
+    - globalPath: ~/.config/wt/config.yaml
+    ↓
+LoadMerged() builds config:
+    1. Start with defaults
+    2. Apply global config
+    3. Overlay project config
+    ↓
+runSetupHooks() runs cfg.Hooks.OnWorktreeCreate
+    (project hooks only, if defined; global hooks only, if no project)
+```
+
+---
+
+## Error Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| Neither config exists | Return error: "no configuration file found" |
+| Project config only | Use project config (no error) |
+| Global config only | Use global config (no error) |
+| Invalid YAML syntax | Fail with file path and error details |
+| Not in Git repo | Skip project config, use global (with warning) |
+| Git not available | Skip project config, use global |
+
+---
+
+## Testing Strategy
+
+### Testing Pyramid
+
+```
+        ▲
+       ╱ ╲
+      ╱   ╲     E2E/Manual (1-2 tests)
+     ╱─────╲    - Full workflow with wt binary
+    ╱       ╲
+   ╱─────────╲  Integration Tests (3-4 tests)
+  ╱           ╲ - Real Git repos, worktrees
+ ╱─────────────╲
+╱               ╲ Unit Tests (8-10 tests)
+─────────────────  - Config discovery, merging
+```
+
+### Unit Tests
+
+| Test | Description |
+|------|-------------|
+| `TestFindConfigs_ProjectConfig` | Finds `.wt.yaml` at Git root |
+| `TestFindConfigs_NoProjectConfig` | Returns empty project path when no `.wt.yaml` |
+| `TestFindConfigs_GlobalOnly` | Not in Git repo → projectPath = "" |
+| `TestFindConfigs_ExplicitPath` | --config flag bypasses discovery |
+| `TestLoadMerged_ScalarsOverride` | Project scalar replaces global |
+| `TestLoadMerged_ArraysReplace` | Project array replaces global entirely |
+| `TestLoadMerged_UndefinedInherits` | Undefined project field inherits global |
+| `TestLoadMerged_ProjectOnly` | No global → project works alone |
+| `TestLoadMerged_GlobalOnly` | No project → global works alone |
+
+### Integration Tests
+
+| Test | Description |
+|------|-------------|
+| `TestIntegration_ProjectConfig_TeamSharing` | Worktree has `.wt.yaml` at root, hooks run |
+| `TestIntegration_GlobalFallback` | No project config → global hooks run |
+| `TestIntegration_OverrideBehavior` | Both configs → project arrays replace |
+| `TestIntegration_GitRootDiscovery` | Run from subdir, finds config at root |
+
+---
+
+## Migration Notes
+
+**Removing `project_overrides`:**
+- The `project_overrides` key in global config is no longer needed
+- Users should move override patterns to project-local `.wt.yaml` files
+- No breaking change: `project_overrides` key is simply ignored if present
+
+**Backward Compatibility:**
+- Existing global configs work unchanged
+- Adding a `.wt.yaml` to a project is additive (new feature)
+- `--config` flag behavior unchanged
+
+---
+
+## Implementation Files
+
+| File | Changes |
+|------|---------|
+| `internal/config/config.go` | Add `FindConfigs()`, `LoadMerged()`, update callers |
+| `internal/config/config_test.go` | Unit tests for discovery and merging |
+| `internal/cli/add.go` | Use new config loading |
+| `internal/worktree/service.go` | Use new config loading |
+| `tests/project_config_integration_test.go` | Integration tests |
+
+---
+
+## Summary
+
+| Aspect | Decision |
+|--------|----------|
+| **Config location** | `.wt.yaml` at Git root (via `git rev-parse --show-toplevel`) |
+| **Precedence** | Project → Global → Defaults |
+| **Merge behavior** | Scalars replace, arrays replace, undefined inherits |
+| **Team sharing** | `.wt.yaml` committed to repo, worktrees get same config |
+| **Complexity** | Low - leverages YAML library behavior |
