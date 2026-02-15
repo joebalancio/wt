@@ -79,6 +79,10 @@ func (w *WorktreeConfig) GetDedicatedPath() string {
 }
 
 // OverrideConfig allows project-specific overrides
+//
+// Deprecated: Use project-local .wt.yaml files instead.
+// This field is kept for backward compatibility but is no longer actively used.
+// Project-specific hooks should be defined in a .wt.yaml file at the repository root.
 type OverrideConfig struct {
 	Match string      `yaml:"match"`
 	Hooks HooksConfig `yaml:"hooks,omitempty"`
