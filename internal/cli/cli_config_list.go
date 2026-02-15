@@ -28,7 +28,9 @@ func NewConfigListCmd() *cobra.Command {
 				Fatal("marshaling config: %v", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), string(data))
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), string(data)); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 }

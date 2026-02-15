@@ -1,3 +1,6 @@
+// Package cli provides the command-line interface for wt using Cobra.
+// It defines all subcommands (add, list, remove, done, stack, session, config, etc.)
+// and handles global flags like --config, --verbose, --dry-run, and --no-tmux.
 package cli
 
 import (
@@ -70,6 +73,6 @@ func shouldCreateTmuxWindow(noTmuxFlag bool) bool {
 
 // Fatal prints an error and exits with code 1
 func Fatal(format string, args ...interface{}) {
-	fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: "+format+"\n", args...)
+	_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: "+format+"\n", args...)
 	os.Exit(1)
 }

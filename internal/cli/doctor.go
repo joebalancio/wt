@@ -19,7 +19,7 @@ import (
 
 // NewDoctorCmd creates the doctor command
 func NewDoctorCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Run health checks on wt installation and environment",
 		Long: `Check wt installation, dependencies, configuration, and repository status.
@@ -32,69 +32,83 @@ This command verifies that:
 - current repository is ready for stacking operations`,
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			ctx := context.Background()
-			out := cmd.OutOrStdout()
-
-			allPass := true
-
-			// Check wt installation
-			fmt.Fprintln(out, "Checking wt installation...")
-			if !checkWTBinary(ctx, out) {
-				allPass = false
-			}
-
-			// Check dependencies
-			fmt.Fprintln(out, "\nChecking dependencies...")
-			gitOK, gitSpiceOK := checkDependencies(ctx, out)
-			if !gitOK {
-				allPass = false
-			}
-
-			// Check configuration
-			fmt.Fprintln(out, "\nChecking configuration...")
-			if !checkConfiguration(out) {
-				allPass = false
-			}
-
-			// Check repository (only if git is available)
-			if gitOK {
-				fmt.Fprintln(out, "\nChecking current repository...")
-				checkRepoDoctor(ctx, out, gitSpiceOK)
-				// Git-spice missing is not critical for basic operations
-			}
-
-			// Summary
-			fmt.Fprintln(out)
-			if allPass {
-				fmt.Fprintln(out, "All checks passed!")
-				os.Exit(0)
-			}
-
-			// Some checks failed
-			if gitOK {
-				// Git is OK but other checks failed
-				os.Exit(2) // Warning
-			}
-			// Critical failure - git not available
-			os.Exit(1)
+			runDoctor(cmd)
 		},
 	}
+}
 
-	return cmd
+func runDoctor(cmd *cobra.Command) {
+	ctx := context.Background()
+	out := cmd.OutOrStdout()
+
+	allPass := true
+
+	// Check wt installation
+	if _, err := fmt.Fprintln(out, "Checking wt installation..."); err != nil {
+		Fatal("Failed to write output: %v", err)
+	}
+	if !checkWTBinary(ctx, out) {
+		allPass = false
+	}
+
+	// Check dependencies
+	if _, err := fmt.Fprintln(out, "\nChecking dependencies..."); err != nil {
+		Fatal("Failed to write output: %v", err)
+	}
+	gitOK, gitSpiceOK := checkDependencies(ctx, out)
+	if !gitOK {
+		allPass = false
+	}
+
+	// Check configuration
+	if _, err := fmt.Fprintln(out, "\nChecking configuration..."); err != nil {
+		Fatal("Failed to write output: %v", err)
+	}
+	if !checkConfiguration(out) {
+		allPass = false
+	}
+
+	// Check repository (only if git is available)
+	if gitOK {
+		if _, err := fmt.Fprintln(out, "\nChecking current repository..."); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
+		checkRepoDoctor(ctx, out, gitSpiceOK)
+		// Git-spice missing is not critical for basic operations
+	}
+
+	// Summary
+	if _, err := fmt.Fprintln(out); err != nil {
+		Fatal("Failed to write output: %v", err)
+	}
+	if allPass {
+		if _, err := fmt.Fprintln(out, "All checks passed!"); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
+		os.Exit(0)
+	}
+
+	// Some checks failed
+	if gitOK {
+		// Git is OK but other checks failed
+		os.Exit(2) // Warning
+	}
+	// Critical failure - git not available
+	os.Exit(1)
 }
 
 func checkWTBinary(_ context.Context, out io.Writer) bool {
 	// Get wt binary path
 	execPath, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(out, "! wt binary path unknown: %v\n", err)
+		_, _ = fmt.Fprintf(out, "! wt binary path unknown: %v\n", err)
 		return false
 	}
-	fmt.Fprintf(out, "✓ wt binary: %s\n", execPath)
+	_, _ = fmt.Fprintf(out, "✓ wt binary: %s\n", execPath)
 
 	// Get version
-	fmt.Fprintf(out, "✓ Version: %s\n", "v2.0.0")
-	fmt.Fprintf(out, "✓ OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	_, _ = fmt.Fprintf(out, "✓ Version: %s\n", "v2.0.0")
+	_, _ = fmt.Fprintf(out, "✓ OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 
 	return true
 }
@@ -103,7 +117,7 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 	// Check git
 	_, err := git.NewClient()
 	if err != nil {
-		fmt.Fprintf(out, "✗ git not found\n")
+		_, _ = fmt.Fprintf(out, "✗ git not found\n")
 		return false, false
 	}
 
@@ -112,42 +126,42 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 	cmd := exec.CommandContext(ctx, "git", "--version")
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(out, "✗ git installed but version check failed\n")
+		_, _ = fmt.Fprintf(out, "✗ git installed but version check failed\n")
 		return true, false
 	}
 	gitVersion := strings.TrimSpace(stdout.String())
-	fmt.Fprintf(out, "✓ git installed: %s\n", gitVersion)
+	_, _ = fmt.Fprintf(out, "✓ git installed: %s\n", gitVersion)
 
 	// Check git worktree support
 	cmd = exec.CommandContext(ctx, "git", "worktree", "list")
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(out, "✗ git worktree not supported\n")
+		_, _ = fmt.Fprintf(out, "✗ git worktree not supported\n")
 		return true, false
 	}
-	fmt.Fprintf(out, "✓ git worktree supported\n")
+	_, _ = fmt.Fprintf(out, "✓ git worktree supported\n")
 
 	// Check git-spice
 	cfg, err := loadConfigForCommand()
 	if err != nil {
-		fmt.Fprintf(out, "! Failed to load config: %v\n", err)
+		_, _ = fmt.Fprintf(out, "! Failed to load config: %v\n", err)
 		return true, false
 	}
 
 	spiceClient, err := spice.NewClient(cfg)
 	if err != nil {
-		fmt.Fprintf(out, "! git-spice not found (required for stacking)\n")
-		fmt.Fprintf(out, "  Install with: cargo install git-spice\n")
-		fmt.Fprintf(out, "              or: brew install git-spice\n")
+		_, _ = fmt.Fprintf(out, "! git-spice not found (required for stacking)\n")
+		_, _ = fmt.Fprintf(out, "  Install with: cargo install git-spice\n")
+		_, _ = fmt.Fprintf(out, "              or: brew install git-spice\n")
 		return true, false
 	}
 
 	version, err := spiceClient.GetVersion(ctx)
 	if err != nil {
-		fmt.Fprintf(out, "! git-spice installed but version check failed\n")
+		_, _ = fmt.Fprintf(out, "! git-spice installed but version check failed\n")
 		return true, false
 	}
 
-	fmt.Fprintf(out, "✓ git-spice installed: %s\n", version)
+	_, _ = fmt.Fprintf(out, "✓ git-spice installed: %s\n", version)
 	return true, true
 }
 
@@ -157,7 +171,7 @@ func checkConfiguration(out io.Writer) bool {
 	if err != nil {
 		home = os.Getenv("HOME")
 		if home == "" {
-			fmt.Fprintf(out, "! Cannot determine home directory\n")
+			_, _ = fmt.Fprintf(out, "! Cannot determine home directory\n")
 			return false
 		}
 	}
@@ -165,24 +179,24 @@ func checkConfiguration(out io.Writer) bool {
 
 	if _, err := os.Stat(configPath); err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(out, "! User config not found: %s\n", configPath)
-			fmt.Fprintf(out, "  Run 'wt init' to create default config\n")
+			_, _ = fmt.Fprintf(out, "! User config not found: %s\n", configPath)
+			_, _ = fmt.Fprintf(out, "  Run 'wt init' to create default config\n")
 			return false
 		}
-		fmt.Fprintf(out, "! Cannot access config: %v\n", err)
+		_, _ = fmt.Fprintf(out, "! Cannot access config: %v\n", err)
 		return false
 	}
 
-	fmt.Fprintf(out, "✓ User config: %s\n", configPath)
+	_, _ = fmt.Fprintf(out, "✓ User config: %s\n", configPath)
 
 	// Validate config
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		fmt.Fprintf(out, "! Config is invalid: %v\n", err)
+		_, _ = fmt.Fprintf(out, "! Config is invalid: %v\n", err)
 		return false
 	}
 
-	fmt.Fprintf(out, "✓ Config is valid YAML\n")
+	_, _ = fmt.Fprintf(out, "✓ Config is valid YAML\n")
 
 	// Check worktree location
 	location := cfg.Worktree.Location
@@ -194,9 +208,9 @@ func checkConfiguration(out io.Writer) bool {
 		if dedicatedPath == "" {
 			dedicatedPath = "~/worktrees"
 		}
-		fmt.Fprintf(out, "✓ Worktree location: dedicated (%s)\n", dedicatedPath)
+		_, _ = fmt.Fprintf(out, "✓ Worktree location: dedicated (%s)\n", dedicatedPath)
 	} else {
-		fmt.Fprintf(out, "✓ Worktree location: per-repo\n")
+		_, _ = fmt.Fprintf(out, "✓ Worktree location: per-repo\n")
 	}
 
 	return true
@@ -205,55 +219,55 @@ func checkConfiguration(out io.Writer) bool {
 func checkRepoDoctor(ctx context.Context, out io.Writer, gitSpiceOK bool) bool {
 	gitClient, err := git.NewClient()
 	if err != nil {
-		fmt.Fprintf(out, "! Git not available for repository check\n")
+		_, _ = fmt.Fprintf(out, "! Git not available for repository check\n")
 		return false
 	}
 
 	// Check if we're in a git repository
 	repoInfo, err := gitClient.GetRepoInfo(ctx)
 	if err != nil {
-		fmt.Fprintf(out, "! Not in a git repository: %v\n", err)
+		_, _ = fmt.Fprintf(out, "! Not in a git repository: %v\n", err)
 		return false
 	}
 
-	fmt.Fprintf(out, "✓ Git repository detected\n")
-	fmt.Fprintf(out, "  Root: %s\n", repoInfo.RootPath)
-	fmt.Fprintf(out, "  Default branch: %s\n", repoInfo.DefaultBranch)
+	_, _ = fmt.Fprintf(out, "✓ Git repository detected\n")
+	_, _ = fmt.Fprintf(out, "  Root: %s\n", repoInfo.RootPath)
+	_, _ = fmt.Fprintf(out, "  Default branch: %s\n", repoInfo.DefaultBranch)
 
 	// Get current branch
 	branch, err := gitClient.GetCurrentBranch(ctx)
 	if err != nil {
 		// Detached HEAD or error
-		fmt.Fprintf(out, "! Cannot determine current branch: %v\n", err)
+		_, _ = fmt.Fprintf(out, "! Cannot determine current branch: %v\n", err)
 		return true // Not critical
 	}
 
-	fmt.Fprintf(out, "✓ On branch: %s\n", branch)
+	_, _ = fmt.Fprintf(out, "✓ On branch: %s\n", branch)
 
 	// Check if we can stack (not on main/master)
 	if branch == repoInfo.DefaultBranch || branch == "main" || branch == "master" {
-		fmt.Fprintf(out, "! Cannot stack on default branch (%s)\n", branch)
-		fmt.Fprintf(out, "  Switch to a feature branch to use 'wt stack'\n")
+		_, _ = fmt.Fprintf(out, "! Cannot stack on default branch (%s)\n", branch)
+		_, _ = fmt.Fprintf(out, "  Switch to a feature branch to use 'wt stack'\n")
 		return gitSpiceOK // Not critical if git-spice is available
 	}
 
-	fmt.Fprintf(out, "✓ Can create stack (not on default branch)\n")
+	_, _ = fmt.Fprintf(out, "✓ Can create stack (not on default branch)\n")
 
 	// Check git-spice stack if available
 	if gitSpiceOK {
 		cfg, err := loadConfigForCommand()
 		if err != nil {
-			fmt.Fprintf(out, "! Failed to load config: %v\n", err)
+			_, _ = fmt.Fprintf(out, "! Failed to load config: %v\n", err)
 		} else {
 			spiceClient, err := spice.NewClient(cfg)
 			if err == nil {
 				stack, err := spiceClient.GetStack(ctx)
 				if err != nil {
-					fmt.Fprintf(out, "! Cannot get git-spice stack: %v\n", err)
+					_, _ = fmt.Fprintf(out, "! Cannot get git-spice stack: %v\n", err)
 				} else if len(stack) == 0 {
-					fmt.Fprintf(out, "! No git-spice stack found (not a stacked branch)\n")
+					_, _ = fmt.Fprintf(out, "! No git-spice stack found (not a stacked branch)\n")
 				} else {
-					fmt.Fprintf(out, "✓ Stacked branch detected (%d branches in stack)\n", len(stack))
+					_, _ = fmt.Fprintf(out, "✓ Stacked branch detected (%d branches in stack)\n", len(stack))
 				}
 			}
 		}

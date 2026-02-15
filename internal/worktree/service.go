@@ -1,3 +1,6 @@
+// Package worktree provides the core service layer for worktree management operations.
+// It orchestrates git worktree operations with configuration and hook execution,
+// handling add, list, remove, and done workflows.
 package worktree
 
 import (

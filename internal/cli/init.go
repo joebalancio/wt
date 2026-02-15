@@ -29,7 +29,9 @@ and verifies that required dependencies (git, git-spice) are installed.`,
 			out := cmd.OutOrStdout()
 
 			// Check dependencies
-			fmt.Fprintln(out, "Checking dependencies...")
+			if _, err := fmt.Fprintln(out, "Checking dependencies..."); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 
 			// Check git
 			if err := checkGit(ctx, out); err != nil {
@@ -42,13 +44,19 @@ and verifies that required dependencies (git, git-spice) are installed.`,
 			}
 
 			// Create config file
-			fmt.Fprintln(out, "\nChecking configuration...")
+			if _, err := fmt.Fprintln(out, "\nChecking configuration..."); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 			if err := createConfigFile(out); err != nil {
 				Fatal("Config setup failed: %v", err)
 			}
 
-			fmt.Fprintln(out, "\n✓ wt initialized successfully")
-			fmt.Fprintf(out, "Config file: %s\n", getConfigPath())
+			if _, err := fmt.Fprintln(out, "\n✓ wt initialized successfully"); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
+			if _, err := fmt.Fprintf(out, "Config file: %s\n", getConfigPath()); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 
@@ -58,11 +66,11 @@ and verifies that required dependencies (git, git-spice) are installed.`,
 func checkGit(_ context.Context, out io.Writer) error {
 	_, err := git.NewClient()
 	if err != nil {
-		fmt.Fprintf(out, "✗ git not found\n")
+		_, _ = fmt.Fprintf(out, "✗ git not found\n")
 		return err
 	}
 
-	fmt.Fprintf(out, "✓ git installed\n")
+	_, _ = fmt.Fprintf(out, "✓ git installed\n")
 	return nil
 }
 
@@ -70,17 +78,17 @@ func checkGitSpice(_ context.Context, out io.Writer) error {
 	// Use detection to check if git-spice is available
 	path, err := detectGitSpice()
 	if err != nil {
-		fmt.Fprintf(out, "✗ git-spice not found\n\n")
-		fmt.Fprintf(out, "  git-spice is required for stacking.\n\n")
-		fmt.Fprintf(out, "  Install with one of:\n")
-		fmt.Fprintf(out, "    cargo install git-spice\n")
-		fmt.Fprintf(out, "    brew install git-spice\n")
-		fmt.Fprintf(out, "    cargo-binstall git-spice\n\n")
-		fmt.Fprintf(out, "  Run 'wt init' again after installing.\n")
+		_, _ = fmt.Fprintf(out, "✗ git-spice not found\n\n")
+		_, _ = fmt.Fprintf(out, "  git-spice is required for stacking.\n\n")
+		_, _ = fmt.Fprintf(out, "  Install with one of:\n")
+		_, _ = fmt.Fprintf(out, "    cargo install git-spice\n")
+		_, _ = fmt.Fprintf(out, "    brew install git-spice\n")
+		_, _ = fmt.Fprintf(out, "    cargo-binstall git-spice\n\n")
+		_, _ = fmt.Fprintf(out, "  Run 'wt init' again after installing.\n")
 		return err
 	}
 
-	fmt.Fprintf(out, "✓ git-spice installed: %s\n", path)
+	_, _ = fmt.Fprintf(out, "✓ git-spice installed: %s\n", path)
 	return nil
 }
 
@@ -89,7 +97,7 @@ func createConfigFile(out io.Writer) error {
 
 	// Check if config already exists
 	if _, err := os.Stat(configPath); err == nil {
-		fmt.Fprintf(out, "✓ Config exists: %s\n", configPath)
+		_, _ = fmt.Fprintf(out, "✓ Config exists: %s\n", configPath)
 		return nil
 	}
 
@@ -99,13 +107,13 @@ func createConfigFile(out io.Writer) error {
 	// Detect git-spice and add to config
 	gitSpicePath, err := detectGitSpice()
 	if err != nil {
-		fmt.Fprintf(out, "Warning: git-spice not found: %v\n", err)
-		fmt.Fprintf(out, "Stacking features will not work.\n")
-		fmt.Fprintf(out, "Install git-spice: cargo install git-spice\n")
-		fmt.Fprintf(out, "Then re-run: wt init\n")
+		_, _ = fmt.Fprintf(out, "Warning: git-spice not found: %v\n", err)
+		_, _ = fmt.Fprintf(out, "Stacking features will not work.\n")
+		_, _ = fmt.Fprintf(out, "Install git-spice: cargo install git-spice\n")
+		_, _ = fmt.Fprintf(out, "Then re-run: wt init\n")
 	} else {
 		cfg.Spice.BinaryPath = gitSpicePath
-		fmt.Fprintf(out, "Detected git-spice at: %s\n", gitSpicePath)
+		_, _ = fmt.Fprintf(out, "Detected git-spice at: %s\n", gitSpicePath)
 	}
 
 	// Validate the default config structure
@@ -118,7 +126,7 @@ func createConfigFile(out io.Writer) error {
 		return fmt.Errorf("writing config: %w", err)
 	}
 
-	fmt.Fprintf(out, "✓ Config created: %s\n", configPath)
+	_, _ = fmt.Fprintf(out, "✓ Config created: %s\n", configPath)
 	return nil
 }
 

@@ -1,3 +1,6 @@
+// Package domain defines the core domain models for wt.
+// It contains types for worktrees, branches, git repositories, and stack branches,
+// providing the shared data structures used across the application layers.
 package domain
 
 import (

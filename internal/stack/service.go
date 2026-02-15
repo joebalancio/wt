@@ -1,3 +1,6 @@
+// Package stack provides services for managing git-spice branch stacks.
+// It handles branch name generation with nanoid suffixes, worktree path resolution,
+// and coordination between git and git-spice for stacked branch workflows.
 package stack
 
 import (
