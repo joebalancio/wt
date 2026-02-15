@@ -3,7 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -184,4 +186,15 @@ func FindConfig(customPath string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no configuration file found")
+}
+
+// FindGitRoot discovers the Git repository root using git rev-parse --show-toplevel
+// Returns an error if not in a Git repository
+func FindGitRoot() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("not in a git repository: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
 }
