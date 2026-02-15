@@ -60,7 +60,7 @@ make fmt                   # Format code (go fmt + gofumpt if available)
 make check                 # Run all checks: fmt + lint + test
 
 # Install development tools
-make tools                 # Install golangci-lint, gofumpt, gox
+make tools                 # Install golangci-lint, gofumpt
 
 # Other useful commands
 make test-cover            # Generate coverage report (opens in browser)
