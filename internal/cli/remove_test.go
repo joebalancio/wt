@@ -10,7 +10,7 @@ func TestNewRemoveCmd_TmuxIntegration(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("NewRemoveCmd() should return a command")
 	}
-	if cmd.Use != "remove <path>" {
-		t.Errorf("Expected command use 'remove <path>', got %q", cmd.Use)
+	if cmd.Use != "remove [path]" {
+		t.Errorf("Expected command use 'remove [path]', got %q", cmd.Use)
 	}
 }
