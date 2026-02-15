@@ -8,9 +8,6 @@ run:
   tests: true
 
 output:
-  # Format: colored-line-number|line-number|json|tab|checkstyle
-  formats:
-    - format: colored-line-number
   # Print lines of code with issue
   print-issued-lines: true
   # Print linter name in the end of issue text
