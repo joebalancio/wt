@@ -348,13 +348,13 @@ func unsetTmuxWindowNamingValue(cfg *config.Config, field string) error {
 // isSupportedKey returns true if key can be manipulated via CLI
 func isSupportedKey(key string) bool {
 	supportedKeys := map[string]bool{
-		"global.tmux_session_prefix":           true,
-		"worktree.location":                    true,
-		"worktree.dedicated_path":               true,
-		"tmux.layout":                          true,
-		"tmux.window_name":                     true,
-		"tmux.attach_on_create":                true,
-		"tmux.window_naming.max_length":        true,
+		"global.tmux_session_prefix":             true,
+		"worktree.location":                      true,
+		"worktree.dedicated_path":                true,
+		"tmux.layout":                            true,
+		"tmux.window_name":                       true,
+		"tmux.attach_on_create":                  true,
+		"tmux.window_naming.max_length":          true,
 		"tmux.window_naming.abbreviate_issue_id": true,
 	}
 	return supportedKeys[key]

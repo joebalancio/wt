@@ -153,8 +153,8 @@ func (s *Service) Done(ctx context.Context, worktreePath, branch string, force b
 	// Run done hooks with template variables
 	if len(s.cfg.Hooks.OnWorktreeDone) > 0 {
 		templateVars := map[string]string{
-			"branch":         branch,
-			"worktree_path":  worktreePath,
+			"branch":        branch,
+			"worktree_path": worktreePath,
 		}
 		runner := executor.NewHookRunner(worktreePath, templateVars)
 		if err := runner.RunHooks(ctx, s.cfg.Hooks.OnWorktreeDone); err != nil {
