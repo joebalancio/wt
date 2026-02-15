@@ -25,6 +25,9 @@ type mockGitClient struct {
 	squashMergeFunc        func(ctx context.Context, sourceBranch string) error
 	createSquashCommitFunc func(ctx context.Context, message string) error
 	isWorktreeDirtyFunc    func(ctx context.Context, path string) (bool, error)
+	isBranchMergedFunc     func(ctx context.Context, branch string) (bool, error)
+	remoteBranchExistsFunc func(ctx context.Context, remote, branch string) (bool, error)
+	deleteRemoteBranchFunc func(ctx context.Context, remote, branch string) error
 }
 
 func (m *mockGitClient) ListWorktrees(ctx context.Context) ([]*domain.Worktree, error) {
@@ -95,6 +98,27 @@ func (m *mockGitClient) IsWorktreeDirty(ctx context.Context, path string) (bool,
 		return m.isWorktreeDirtyFunc(ctx, path)
 	}
 	return false, nil
+}
+
+func (m *mockGitClient) IsBranchMerged(ctx context.Context, branch string) (bool, error) {
+	if m.isBranchMergedFunc != nil {
+		return m.isBranchMergedFunc(ctx, branch)
+	}
+	return true, nil
+}
+
+func (m *mockGitClient) RemoteBranchExists(ctx context.Context, remote, branch string) (bool, error) {
+	if m.remoteBranchExistsFunc != nil {
+		return m.remoteBranchExistsFunc(ctx, remote, branch)
+	}
+	return false, nil
+}
+
+func (m *mockGitClient) DeleteRemoteBranch(ctx context.Context, remote, branch string) error {
+	if m.deleteRemoteBranchFunc != nil {
+		return m.deleteRemoteBranchFunc(ctx, remote, branch)
+	}
+	return nil
 }
 
 func TestService_List(t *testing.T) {

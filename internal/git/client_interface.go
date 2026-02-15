@@ -23,4 +23,7 @@ type GitClient interface {
 	SquashMerge(ctx context.Context, sourceBranch string) error
 	CreateSquashCommit(ctx context.Context, message string) error
 	IsWorktreeDirty(ctx context.Context, path string) (bool, error)
+	IsBranchMerged(ctx context.Context, branch string) (bool, error)
+	RemoteBranchExists(ctx context.Context, remote, branch string) (bool, error)
+	DeleteRemoteBranch(ctx context.Context, remote, branch string) error
 }
