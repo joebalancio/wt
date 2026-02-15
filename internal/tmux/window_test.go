@@ -79,7 +79,7 @@ func TestClient_SelectWindow(t *testing.T) {
 
 	// Create test window first
 	_ = client.CreateNewWindow("test-select-window", "/tmp")
-	defer client.KillWindow("test-select-window")
+	defer func() { _ = client.KillWindow("test-select-window") }()
 
 	// Select the window
 	err = client.SelectWindow("test-select-window")
@@ -100,7 +100,7 @@ func TestClient_SendKeys(t *testing.T) {
 
 	// Create test window
 	_ = client.CreateNewWindow("test-send-keys", "/tmp")
-	defer client.KillWindow("test-send-keys")
+	defer func() { _ = client.KillWindow("test-send-keys") }()
 
 	// Send keys to the window
 	err = client.SendKeys("test-send-keys", "echo 'test'", true)
@@ -181,7 +181,7 @@ func TestClient_CreateOrSelectWindow_ExistingWindow(t *testing.T) {
 
 	// Create the window first
 	_ = client.CreateNewWindow(testWindow, "/tmp")
-	defer client.KillWindow(testWindow)
+	defer func() { _ = client.KillWindow(testWindow) }()
 
 	// Create or select (should select since it exists)
 	err = client.CreateOrSelectWindow(testWindow, "/tmp")

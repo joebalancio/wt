@@ -41,8 +41,10 @@ func NewConfigSetCmd() *cobra.Command {
 				Fatal("saving config: %v", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(),
-				"✓ Updated %s: %s in %s\n", key, value, cfgPath)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(),
+				"✓ Updated %s: %s in %s\n", key, value, cfgPath); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 }

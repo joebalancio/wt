@@ -1,3 +1,6 @@
+// Package config handles YAML configuration loading, validation, and discovery for wt.
+// Configuration is loaded from .wt.yaml in the current directory or ~/.config/wt/config.yaml
+// following XDG standards, with support for hooks, tmux settings, and worktree location modes.
 package config
 
 import (

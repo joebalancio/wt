@@ -1,3 +1,6 @@
+// Package executor handles subprocess execution for hooks and shell commands.
+// It provides timeout management, parallel execution support, and output capture
+// for running user-defined hooks during worktree lifecycle events.
 package executor
 
 import (

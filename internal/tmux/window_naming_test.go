@@ -165,7 +165,7 @@ func TestGenerateWindowName(t *testing.T) {
 
 			// Verify suffix is hexadecimal
 			for _, c := range suffix {
-				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				if c < '0' || c > '9' && c < 'a' || c > 'f' {
 					t.Errorf("GenerateWindowName(%q) = %q, suffix should be hex", tt.branch, got)
 					break
 				}
@@ -253,7 +253,7 @@ func TestGenerateStackWindowName(t *testing.T) {
 
 			// Verify hash is hexadecimal
 			for _, c := range hashPart {
-				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				if c < '0' || c > '9' && c < 'a' || c > 'f' {
 					t.Errorf("GenerateStackWindowName(%q, %d) = %q, hash should be hex",
 						tt.branch, tt.stackLevel, got)
 					break
@@ -283,7 +283,7 @@ func TestHashBranch(t *testing.T) {
 			}
 			// Verify it's hexadecimal
 			for _, c := range got {
-				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				if c < '0' || c > '9' && c < 'a' || c > 'f' {
 					t.Errorf("hashBranch(%q) = %q, want hexadecimal chars only", tt.branch, got)
 					break
 				}
@@ -359,7 +359,7 @@ func TestGenerateWindowNameWithHash(t *testing.T) {
 			}
 
 			for _, c := range suffix {
-				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				if c < '0' || c > '9' && c < 'a' || c > 'f' {
 					t.Errorf("GenerateWindowName(%q) = %q, suffix should be hex", tt.branch, got)
 					break
 				}

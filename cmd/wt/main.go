@@ -1,3 +1,5 @@
+// Package main is the entry point for the wt CLI tool.
+// Wt is a high-level CLI for managing git worktrees with tmux integration.
 package main
 
 import (

@@ -16,7 +16,11 @@ import (
 func printWorktrees(w io.Writer, worktrees []*domain.Worktree) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	for _, wt := range worktrees {
-		fmt.Fprintf(tw, "%s\t%s\n", wt.Path, wt.Branch)
+		if _, err := fmt.Fprintf(tw, "%s\t%s\n", wt.Path, wt.Branch); err != nil {
+			// If we can't write to the tabwriter, flush and return the error
+			_ = tw.Flush()
+			return err
+		}
 	}
 	return tw.Flush()
 }

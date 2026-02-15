@@ -12,7 +12,7 @@ func TestValidateSchema(t *testing.T) {
 	}{
 		{
 			name:    "valid default",
-			modify:  func(c *Config) {},
+			modify:  func(*Config) {},
 			wantErr: false,
 		},
 		{

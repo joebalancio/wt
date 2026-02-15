@@ -1,3 +1,6 @@
+// Package spice provides a client wrapper for git-spice operations.
+// Git-spice is used for branch stack management, enabling wt to create and manage
+// stacked branches with unique nanoid suffixes for collision resistance.
 package spice
 
 import (

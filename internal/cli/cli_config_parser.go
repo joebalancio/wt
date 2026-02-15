@@ -388,14 +388,14 @@ func parseBool(s string) (bool, error) {
 }
 
 // parseInt converts a string to integer with range validation
-func parseInt(s string, min, max int) (int, error) {
+func parseInt(s string, minVal, maxVal int) (int, error) {
 	var i int
 	_, err := fmt.Sscanf(s, "%d", &i)
 	if err != nil {
 		return 0, fmt.Errorf("invalid integer value: %q", s)
 	}
-	if i < min || i > max {
-		return 0, fmt.Errorf("integer value %q out of range (must be between %d and %d)", s, min, max)
+	if i < minVal || i > maxVal {
+		return 0, fmt.Errorf("integer value %q out of range (must be between %d and %d)", s, minVal, maxVal)
 	}
 	return i, nil
 }

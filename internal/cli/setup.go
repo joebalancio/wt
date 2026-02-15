@@ -46,14 +46,18 @@ to refresh your development environment.`,
 				Fatal("Setup hooks should be run from a worktree, not the main repository")
 			}
 
-			fmt.Fprintf(out, "Running setup hooks for: %s\n", filepath.Base(wd))
+			if _, err := fmt.Fprintf(out, "Running setup hooks for: %s\n", filepath.Base(wd)); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 
 			// Run hooks
 			if err := runSetupHooks(ctx, wd); err != nil {
 				Fatal("Setup hooks failed: %v", err)
 			}
 
-			fmt.Fprintln(out, "✓ Setup complete")
+			if _, err := fmt.Fprintln(out, "✓ Setup complete"); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 

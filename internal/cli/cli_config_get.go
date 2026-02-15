@@ -25,7 +25,9 @@ func NewConfigGetCmd() *cobra.Command {
 				Fatal("%v", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), formatValue(value))
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), formatValue(value)); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 }

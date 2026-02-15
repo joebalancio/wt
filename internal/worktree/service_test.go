@@ -140,7 +140,7 @@ func TestService_List(t *testing.T) {
 		if err == nil {
 			t.Fatal("List() expected error, got nil")
 		}
-		if err == nil || err.Error() == "" {
+		if err.Error() == "" {
 			t.Errorf("expected error message, got empty")
 		}
 	})
@@ -402,7 +402,7 @@ func TestService_Done(t *testing.T) {
 
 	t.Run("merge failure", func(t *testing.T) {
 		mock := &mockGitClient{
-			squashMergeFunc: func(_ context.Context, sourceBranch string) error {
+			squashMergeFunc: func(_ context.Context, _ string) error {
 				return fmt.Errorf("merge conflict")
 			},
 		}
@@ -421,7 +421,7 @@ func TestService_Done(t *testing.T) {
 
 	t.Run("branch not found", func(t *testing.T) {
 		mock := &mockGitClient{
-			branchExistsFunc: func(_ context.Context, branch string) (bool, error) {
+			branchExistsFunc: func(_ context.Context, _ string) (bool, error) {
 				return false, nil
 			},
 		}
@@ -440,13 +440,13 @@ func TestService_Done(t *testing.T) {
 
 	t.Run("dirty worktree without force", func(t *testing.T) {
 		mock := &mockGitClient{
-			squashMergeFunc: func(_ context.Context, sourceBranch string) error {
+			squashMergeFunc: func(_ context.Context, _ string) error {
 				return nil
 			},
-			createSquashCommitFunc: func(_ context.Context, message string) error {
+			createSquashCommitFunc: func(_ context.Context, _ string) error {
 				return nil
 			},
-			isWorktreeDirtyFunc: func(_ context.Context, path string) (bool, error) {
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
 				return true, nil
 			},
 		}
@@ -465,22 +465,22 @@ func TestService_Done(t *testing.T) {
 
 	t.Run("dirty worktree with force", func(t *testing.T) {
 		mock := &mockGitClient{
-			squashMergeFunc: func(_ context.Context, sourceBranch string) error {
+			squashMergeFunc: func(_ context.Context, _ string) error {
 				return nil
 			},
-			createSquashCommitFunc: func(_ context.Context, message string) error {
+			createSquashCommitFunc: func(_ context.Context, _ string) error {
 				return nil
 			},
-			isWorktreeDirtyFunc: func(_ context.Context, path string) (bool, error) {
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
 				return true, nil
 			},
-			removeWorktreeFunc: func(_ context.Context, path string, force bool) error {
+			removeWorktreeFunc: func(_ context.Context, _ string, force bool) error {
 				if !force {
 					t.Errorf("expected force=true, got false")
 				}
 				return nil
 			},
-			deleteBranchFunc: func(_ context.Context, branch string, force bool) error {
+			deleteBranchFunc: func(_ context.Context, _ string, force bool) error {
 				if !force {
 					t.Errorf("expected force=true, got false")
 				}

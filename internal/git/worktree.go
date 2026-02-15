@@ -1,3 +1,6 @@
+// Package git provides a client wrapper for git worktree operations.
+// It wraps the git CLI to provide operations like listing, adding, and removing worktrees,
+// as well as branch management and repository information retrieval.
 package git
 
 import (

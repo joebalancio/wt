@@ -58,7 +58,37 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		Fatal("Cannot stack on '%s'. Stack on feature branches only.\nUse --force to override.", currentBranch)
 	}
 
-	// Create clients and service
+	stackService := initStackService()
+
+	// Get the optional name argument
+	var name string
+	if len(args) > 0 {
+		name = args[0]
+	}
+
+	// Create the stack branch
+	spec := stack.BranchSpec{
+		Name: name,
+		Base: stackBase,
+	}
+
+	stackBranch, err := stackService.CreateStackBranch(ctx, spec)
+	if err != nil {
+		Fatal("Failed to create stack branch: %v", err)
+	}
+
+	if _, err := fmt.Fprintf(out, "Created stacked branch: %s\n", stackBranch.Name); err != nil {
+		Fatal("Failed to write output: %v", err)
+	}
+
+	// Create worktree
+	if !noSetup {
+		createStackWorktree(ctx, cmd, stackService, stackBranch.Name)
+	}
+}
+
+// initStackService initializes git client, config, and stack service
+func initStackService() *stack.Service {
 	gitClient, err := git.NewClient()
 	if err != nil {
 		Fatal("Failed to create git client: %v", err)
@@ -84,58 +114,59 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		Fatal("Failed to create stack service: %v", err)
 	}
 
-	// Get the optional name argument
-	var name string
-	if len(args) > 0 {
-		name = args[0]
-	}
+	return stackService
+}
 
-	// Create the stack branch
-	spec := stack.BranchSpec{
-		Name: name,
-		Base: stackBase,
-	}
+// createStackWorktree creates a worktree for the stack branch and sets up hooks and tmux
+func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName string) {
+	out := cmd.OutOrStdout()
 
-	stackBranch, err := stackService.CreateStackBranch(ctx, spec)
+	worktree, err := stackService.CreateWorktree(ctx, branchName)
 	if err != nil {
-		Fatal("Failed to create stack branch: %v", err)
+		Fatal("Failed to create worktree: %v", err)
+	}
+	if _, err := fmt.Fprintf(out, "Created worktree: %s\n", worktree.Path); err != nil {
+		Fatal("Failed to write output: %v", err)
 	}
 
-	fmt.Fprintf(out, "Created stacked branch: %s\n", stackBranch.Name)
+	// Run setup hooks
+	if err := runSetupHooks(ctx, worktree.Path); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+	}
 
-	// Create worktree
-	if !noSetup {
-		worktree, err := stackService.CreateWorktree(ctx, stackBranch.Name)
-		if err != nil {
-			Fatal("Failed to create worktree: %v", err)
-		}
-		fmt.Fprintf(out, "Created worktree: %s\n", worktree.Path)
+	// Create tmux window if in tmux and not disabled
+	createStackTmuxWindow(ctx, cmd, stackService, branchName, worktree.Path)
+}
 
-		// Run setup hooks
-		if err := runSetupHooks(ctx, worktree.Path); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
-		// Create tmux window if in tmux and not disabled
-		if shouldCreateTmuxWindow(NoTmux()) {
-			tmuxClient, err := tmux.NewClient()
-			if err == nil {
-				// Get stack level for window naming
-				stackBranches, _ := stackService.GetStack(ctx)
-				stackLevel := 0
-				for i, sb := range stackBranches {
-					if sb.Name == stackBranch.Name {
-						stackLevel = i
-						break
-					}
-				}
+// createStackTmuxWindow creates a tmux window for the stack branch
+func createStackTmuxWindow(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName, worktreePath string) {
+	if !shouldCreateTmuxWindow(NoTmux()) {
+		return
+	}
 
-				windowName := tmux.GenerateStackWindowName(stackBranch.Name, stackLevel)
-				if err := tmuxClient.CreateOrSelectWindow(windowName, worktree.Path); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
-				}
-			}
+	tmuxClient, err := tmux.NewClient()
+	if err != nil {
+		return
+	}
+
+	// Get stack level for window naming
+	stackLevel := getStackLevel(ctx, stackService, branchName)
+
+	windowName := tmux.GenerateStackWindowName(branchName, stackLevel)
+	if err := tmuxClient.CreateOrSelectWindow(windowName, worktreePath); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+	}
+}
+
+// getStackLevel returns the stack level for a given branch name
+func getStackLevel(ctx context.Context, stackService *stack.Service, branchName string) int {
+	stackBranches, _ := stackService.GetStack(ctx)
+	for i, sb := range stackBranches {
+		if sb.Name == branchName {
+			return i
 		}
 	}
+	return 0
 }
 
 // NewStackListCmd creates the stack list subcommand
@@ -193,7 +224,9 @@ func NewStackListCmd() *cobra.Command {
 
 			// Format and display tree
 			treeOutput := stack.FormatStackTree(branches)
-			fmt.Fprint(out, treeOutput)
+			if _, err := fmt.Fprint(out, treeOutput); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 

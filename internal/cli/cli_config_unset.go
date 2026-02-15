@@ -30,8 +30,10 @@ func NewConfigUnsetCmd() *cobra.Command {
 				Fatal("saving config: %v", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(),
-				"✓ Removed %s from %s\n", key, cfgPath)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(),
+				"✓ Removed %s from %s\n", key, cfgPath); err != nil {
+				Fatal("Failed to write output: %v", err)
+			}
 		},
 	}
 }
