@@ -32,11 +32,14 @@ func NewConfigGetCmd() *cobra.Command {
 	}
 }
 
-// loadActiveConfig loads the active config (respects discovery order)
+// loadActiveConfig loads the active config (respects discovery order with merging)
 func loadActiveConfig() (*config.Config, error) {
-	configPath, err := config.FindConfig("")
+	customPath, _ := rootCmd.PersistentFlags().GetString("config")
+
+	projectPath, globalPath, err := config.FindConfigs(customPath)
 	if err != nil {
 		return config.DefaultConfig(), nil
 	}
-	return config.Load(configPath)
+
+	return config.LoadMerged(projectPath, globalPath)
 }

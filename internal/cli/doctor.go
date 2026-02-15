@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -166,37 +165,31 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 }
 
 func checkConfiguration(out io.Writer) bool {
-	// Check user config
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = os.Getenv("HOME")
-		if home == "" {
-			_, _ = fmt.Fprintf(out, "! Cannot determine home directory\n")
-			return false
-		}
-	}
-	configPath := filepath.Join(home, ".config", "wt", "config.yaml")
+	customPath, _ := rootCmd.PersistentFlags().GetString("config")
 
-	if _, err := os.Stat(configPath); err != nil {
-		if os.IsNotExist(err) {
-			_, _ = fmt.Fprintf(out, "! User config not found: %s\n", configPath)
-			_, _ = fmt.Fprintf(out, "  Run 'wt init' to create default config\n")
-			return false
-		}
-		_, _ = fmt.Fprintf(out, "! Cannot access config: %v\n", err)
+	projectPath, globalPath, err := config.FindConfigs(customPath)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, "! No configuration file found")
+		_, _ = fmt.Fprintln(out, "  Run 'wt config set <key> <value>' to create one")
 		return false
 	}
 
-	_, _ = fmt.Fprintf(out, "✓ User config: %s\n", configPath)
+	// Show which configs are active
+	if projectPath != "" {
+		_, _ = fmt.Fprintf(out, "✓ Project config: %s\n", projectPath)
+	}
+	if globalPath != "" {
+		_, _ = fmt.Fprintf(out, "✓ Global config: %s\n", globalPath)
+	}
 
-	// Validate config
-	cfg, err := config.Load(configPath)
+	// Validate merged config
+	cfg, err := config.LoadMerged(projectPath, globalPath)
 	if err != nil {
 		_, _ = fmt.Fprintf(out, "! Config is invalid: %v\n", err)
 		return false
 	}
 
-	_, _ = fmt.Fprintf(out, "✓ Config is valid YAML\n")
+	_, _ = fmt.Fprintln(out, "✓ Config is valid YAML")
 
 	// Check worktree location
 	location := cfg.Worktree.Location
@@ -210,7 +203,7 @@ func checkConfiguration(out io.Writer) bool {
 		}
 		_, _ = fmt.Fprintf(out, "✓ Worktree location: dedicated (%s)\n", dedicatedPath)
 	} else {
-		_, _ = fmt.Fprintf(out, "✓ Worktree location: per-repo\n")
+		_, _ = fmt.Fprintln(out, "✓ Worktree location: per-repo")
 	}
 
 	return true

@@ -241,12 +241,20 @@ Both `internal/git` and `internal/tmux` use the same pattern:
 - Methods wrap CLI commands (`git worktree add`, `tmux new-session`)
 - Errors are wrapped with context: `fmt.Errorf("operation: %w", err)`
 
-**2. Configuration Discovery Order**
+**2. Configuration Discovery Order (v3)**
 
-Config is loaded in this priority order (internal/config/config.go:FindConfig):
-1. `--config` flag value
-2. `.wt.yaml` in current directory
-3. `~/.config/wt/config.yaml` (XDG standard)
+Config is loaded in this priority order:
+1. `--config` flag value (single config, no merging)
+2. `.wt.yaml` at Git root (project-local, merges with global)
+3. `~/.config/wt/config.yaml` (user-global)
+
+When both project and global configs exist, they are merged:
+- Project config overlays global config
+- Scalars (strings, bools): project value wins
+- Arrays (hooks): project array replaces global entirely
+- Undefined fields: inherit from global
+
+Implementation: `internal/config/config.go:FindConfig()` discovers Git root and merges configs.
 
 **Worktree Location Configuration**
 

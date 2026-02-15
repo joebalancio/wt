@@ -6,7 +6,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -80,6 +82,10 @@ func (w *WorktreeConfig) GetDedicatedPath() string {
 }
 
 // OverrideConfig allows project-specific overrides
+//
+// Deprecated: Use project-local .wt.yaml files instead.
+// This field is kept for backward compatibility but is no longer actively used.
+// Project-specific hooks should be defined in a .wt.yaml file at the repository root.
 type OverrideConfig struct {
 	Match string      `yaml:"match"`
 	Hooks HooksConfig `yaml:"hooks,omitempty"`
@@ -120,6 +126,40 @@ func Load(path string) (*Config, error) {
 	cfg := DefaultConfig()
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+// LoadMerged loads and merges project and global configurations
+// Precedence: project > global > defaults
+// Merge semantics:
+//   - Scalars: project value replaces global
+//   - Arrays: project array replaces global entirely
+//   - Undefined: inherits from global/defaults
+func LoadMerged(projectPath, globalPath string) (*Config, error) {
+	cfg := DefaultConfig()
+
+	// Load global config first (if exists)
+	if globalPath != "" {
+		data, err := os.ReadFile(globalPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading global config: %w", err)
+		}
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("parsing global config: %w", err)
+		}
+	}
+
+	// Overlay project config (if exists)
+	if projectPath != "" {
+		data, err := os.ReadFile(projectPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading project config: %w", err)
+		}
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("parsing project config: %w", err)
+		}
 	}
 
 	return cfg, nil
@@ -187,4 +227,54 @@ func FindConfig(customPath string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no configuration file found")
+}
+
+// FindGitRoot discovers the Git repository root using git rev-parse --show-toplevel
+// Returns an error if not in a Git repository
+func FindGitRoot() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("not in a git repository: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// FindConfigs discovers project and global config paths
+// projectPath: .wt.yaml at Git root (may be "")
+// globalPath: ~/.config/wt/config.yaml (may be "")
+// Returns error only if neither config exists
+func FindConfigs(customPath string) (projectPath, globalPath string, err error) {
+	// If custom path provided, use it exclusively
+	if customPath != "" {
+		if _, statErr := os.Stat(customPath); statErr != nil {
+			return "", "", fmt.Errorf("custom config path not found: %w", statErr)
+		}
+		return customPath, "", nil
+	}
+
+	// Try to find project config at Git root
+	gitRoot, gitErr := FindGitRoot()
+	if gitErr == nil {
+		candidateProject := filepath.Join(gitRoot, ".wt.yaml")
+		if _, statErr := os.Stat(candidateProject); statErr == nil {
+			projectPath = candidateProject
+		}
+	}
+
+	// Check for global config
+	home, homeErr := os.UserHomeDir()
+	if homeErr == nil {
+		candidateGlobal := filepath.Join(home, ".config", "wt", "config.yaml")
+		if _, statErr := os.Stat(candidateGlobal); statErr == nil {
+			globalPath = candidateGlobal
+		}
+	}
+
+	// Return error only if no configs found
+	if projectPath == "" && globalPath == "" {
+		return "", "", fmt.Errorf("no configuration file found")
+	}
+
+	return projectPath, globalPath, nil
 }

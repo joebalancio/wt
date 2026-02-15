@@ -22,7 +22,9 @@ func NewConfigValidateCmd() *cobra.Command {
 }
 
 func runConfigValidate(cmd *cobra.Command) {
-	configPath, err := config.FindConfig("")
+	customPath, _ := cmd.Flags().GetString("config")
+
+	projectPath, globalPath, err := config.FindConfigs(customPath)
 	if err != nil {
 		if _, err := fmt.Fprintln(cmd.OutOrStderr(), "✗ No config file found"); err != nil {
 			Fatal("Failed to write error: %v", err)
@@ -30,32 +32,45 @@ func runConfigValidate(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
-	// Parse YAML
-	cfg, err := config.Load(configPath)
+	// Validate merged config
+	cfg, err := config.LoadMerged(projectPath, globalPath)
 	if err != nil {
 		if _, writeErr := fmt.Fprintf(cmd.OutOrStderr(),
-			"✗ YAML syntax error: %v\n", err); writeErr != nil {
+			"✗ Config load error: %v\n", err); writeErr != nil {
 			Fatal("Failed to write error: %v", writeErr)
 		}
 		os.Exit(1)
 	}
 
-	// Validate schema
+	// Schema validation
 	if err := cfg.ValidateSchema(); err != nil {
 		if _, writeErr := fmt.Fprintf(cmd.OutOrStderr(),
-			"✗ Schema validation failed: %v\n", err); writeErr != nil {
+			"✗ Schema validation error: %v\n", err); writeErr != nil {
 			Fatal("Failed to write error: %v", writeErr)
 		}
 		os.Exit(1)
 	}
 
-	printValidationSuccess(cmd.OutOrStdout(), configPath)
+	printValidationSuccess(cmd.OutOrStdout(), projectPath, globalPath)
 }
 
-func printValidationSuccess(out io.Writer, configPath string) {
-	if _, err := fmt.Fprintf(out, "✓ Config is valid: %s\n", configPath); err != nil {
+func printValidationSuccess(out io.Writer, projectPath, globalPath string) {
+	if _, err := fmt.Fprintln(out, "✓ Configuration is valid"); err != nil {
 		Fatal("Failed to write output: %v", err)
 	}
+
+	// Show which configs are active
+	if projectPath != "" {
+		if _, err := fmt.Fprintf(out, "  Project: %s\n", projectPath); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
+	}
+	if globalPath != "" {
+		if _, err := fmt.Fprintf(out, "  Global: %s\n", globalPath); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
+	}
+
 	if _, err := fmt.Fprintln(out, "✓ YAML syntax valid"); err != nil {
 		Fatal("Failed to write output: %v", err)
 	}

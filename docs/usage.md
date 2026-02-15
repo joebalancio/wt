@@ -163,11 +163,23 @@ wt remove /path/to/worktree --force
 
 ## Configuration
 
-wt uses YAML configuration files that are searched in the following order:
+wt uses YAML configuration files with a layered approach:
 
-1. Path specified by `--config` flag
-2. `.wt.yaml` in the current directory
-3. `~/.config/wt/config.yaml` (XDG standard location)
+### Configuration Discovery (v3)
+
+Configs are loaded and merged in this order:
+
+1. `--config` flag value (single config, no merging)
+2. `.wt.yaml` at Git root (project-local, merges with global)
+3. `~/.config/wt/config.yaml` (user-global, XDG standard)
+
+**Merge semantics when both project and global configs exist:**
+- Project config overlays global config
+- Scalars (strings, bools, numbers): project value wins
+- Arrays (hooks): project array replaces global entirely
+- Undefined fields: inherit from global
+
+This allows team-wide defaults in `~/.config/wt/config.yaml` with project-specific overrides in `.wt.yaml` at the repository root.
 
 ### Configuration Options
 
@@ -194,13 +206,16 @@ hooks:
     - run: "rm -rf node_modules"
       cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
 
-# Project-specific overrides using glob patterns
-project_overrides:
-  - match: "**/*rust*"                   # Matches projects with "rust" in path
-    hooks:
-      on_worktree_create:
-        - run: "cargo fetch"
-          cwd: "{worktree_path}"         # Template expansion NOT YET IMPLEMENTED
+# Project-specific configuration
+# DEPRECATED: Use .wt.yaml in the repository root instead
+# The project_overrides field is kept for backward compatibility but is no longer used.
+# To configure project-specific hooks, create a .wt.yaml file in the repository root.
+# project_overrides:
+#   - match: "**/*rust*"                 # Matches projects with "rust" in path
+#     hooks:
+#       on_worktree_create:
+#         - run: "cargo fetch"
+#           cwd: "{worktree_path}"
 ```
 
 **Worktree Location Modes:**
@@ -304,12 +319,13 @@ wt config set tmux.attach_on_create maybe
 # Unsupported key
 wt config set hooks.on_worktree_create "echo hi"
 # Error: key "hooks.on_worktree_create" not supported for CLI manipulation
-#        Edit config file directly to modify hooks or project_overrides
+#        Edit config file directly to modify hooks
 ```
 
 **Notes:**
 - `set` and `unset` commands always modify the global config (`~/.config/wt/config.yaml`)
-- For hooks and project_overrides, edit the config file directly
+- For hooks, edit the config file directly (project-local `.wt.yaml` or global config)
+- `project_overrides` is deprecated; use project-local `.wt.yaml` files instead
 - `get` and `list` respect the config discovery order (flag → local → global)
 
 ---
