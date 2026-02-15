@@ -6,7 +6,7 @@ A CLI tool for managing git worktrees with configurable hooks.
 
 - **Worktree Management**: Add, list, and remove git worktrees
 - **Configurable Hooks**: Run commands after worktree operations (npm install, cargo build, etc.)
-- **Project-Specific Configs**: Override settings per project using glob patterns
+- **Project-Local Configs**: Per-project settings via `.wt.yaml` at repository root
 - **Filtering**: Filter worktrees by branch name or path prefix
 - **Branch Stacking**: Integration with git-spice for stacked branch workflows
 
@@ -48,8 +48,14 @@ wt add feature/login
 # Add a worktree from a specific base branch
 wt add feature/experimental --base main
 
-# Remove a worktree by branch name
+# Remove a worktree and its branch
 wt remove feature/login
+
+# Force remove (uncommitted changes or unmerged branch)
+wt remove feature/login --force
+
+# Also delete remote branch
+wt remove feature/login --force=remote
 
 # Show help
 wt --help
@@ -101,13 +107,7 @@ wt stack list
 
 ### Configuration
 
-Worktree location is configurable in `~/.config/wt/config.yaml`:
-
-```yaml
-worktree:
-  location: dedicated      # "dedicated" or "per-repo"
-  dedicated_path: ~/worktrees  # custom path for dedicated mode
-```
+Worktree location is configurable (see [Configuration](#configuration) below):
 
 ### Health Check
 
@@ -151,7 +151,14 @@ See [docs/usage.md](docs/usage.md) for detailed usage examples and command refer
 
 ## Configuration
 
-Create a config file at `~/.config/wt/config.yaml` or `.wt.yaml` in your project:
+Configuration is loaded with **layered merging**:
+
+1. **Global**: `~/.config/wt/config.yaml` - User-wide defaults
+2. **Project**: `.wt.yaml` at repository root - Overrides global settings
+
+**Merge behavior**: Project config overlays global config. Scalars (strings, bools) use project value; arrays (hooks) are replaced entirely.
+
+Create a config file:
 
 ```yaml
 # Git-spice configuration for branch stacking
@@ -176,8 +183,6 @@ The `spice.binary_path` setting specifies the git-spice binary location.
 - Or set manually: `binary_path: "/usr/local/bin/git-spice"`
 
 **Note**: wt uses "git-spice" command by default to avoid conflicts with Ghostscript's "gs". If your git-spice is installed as "gs", run `wt init` to update your config automatically.
-
-See [configs/example.yaml](configs/example.yaml) for a complete example.
 
 ## Development
 
