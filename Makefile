@@ -109,6 +109,6 @@ precommit: fmt lint test
 ## tools: Install development tools
 tools:
 	@echo "Installing development tools..."
-	@curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $$(go env GOPATH)/bin
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin
 	@$(GO) install mvdan.cc/gofumpt@latest
 	@echo "Tools installed successfully!"
