@@ -97,9 +97,13 @@ func loadLocalConfigOnly(projectPath string) *config.Config {
 // loadMergedConfigOrDie loads merged config, exits on error
 // Shows a warning if outside git repo but still returns config
 func loadMergedConfigOrDie(projectPath, globalPath string) *config.Config {
-	// Show warning if outside git repo (no project path) but we have global path
-	if projectPath == "" && globalPath != "" {
-		Warn("not in a git repository. Showing global config.")
+	// Show warning if outside git repo (no project path)
+	if projectPath == "" {
+		if globalPath != "" {
+			Warn("not in a git repository. Showing global config.")
+		} else {
+			Warn("not in a git repository. Showing defaults only.")
+		}
 	}
 
 	cfg, err := loadMergedConfig(projectPath, globalPath)
