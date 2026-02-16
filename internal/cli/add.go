@@ -5,10 +5,8 @@ import (
 	"fmt"
 
 	"github.com/joebalancio/wt/internal/git"
-	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
-	"github.com/joebalancio/wt/pkg/executor"
 	"github.com/spf13/cobra"
 )
 
@@ -93,34 +91,6 @@ func runAddCommand(cmd *cobra.Command, branch, base, path string, force bool, tr
 	createTmuxWindowForWorktree(cmd, wt.Branch, wt.Path)
 }
 
-// createTmuxWindowForWorktree creates a tmux window for the worktree if conditions are met
-func createTmuxWindowForWorktree(cmd *cobra.Command, branch, worktreePath string) {
-	if !shouldCreateTmuxWindow(NoTmux()) {
-		return
-	}
-
-	tmuxClient, err := tmux.NewClient()
-	if err != nil {
-		return
-	}
-
-	windowName := tmux.GenerateWindowName(branch)
-	if err := tmuxClient.CreateOrSelectWindow(windowName, worktreePath); err != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
-	}
-}
-
 func init() {
 	RegisterCommand(NewAddCmd())
-}
-
-// runSetupHooks executes post-create hooks for a worktree
-func runSetupHooks(ctx context.Context, worktreePath string) error {
-	cfg, err := loadConfigForCommand()
-	if err != nil {
-		return err
-	}
-
-	runner := executor.NewHookRunner(worktreePath)
-	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
 }
