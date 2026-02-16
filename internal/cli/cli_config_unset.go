@@ -37,3 +37,13 @@ func NewConfigUnsetCmd() *cobra.Command {
 		},
 	}
 }
+
+// getGlobalConfigPath returns the global config file path
+// TODO: Remove this function when cli_config_unset.go is updated to use ResolveConfigPaths (Task 3)
+func getGlobalConfigPath() string {
+	_, globalPath, err := ResolveConfigPaths(ScopeGlobal, OpWrite)
+	if err != nil {
+		Fatal("%v", err)
+	}
+	return globalPath
+}

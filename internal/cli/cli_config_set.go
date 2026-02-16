@@ -88,13 +88,3 @@ func loadOrCreateConfig(path string) (*config.Config, error) {
 	}
 	return cfg, nil
 }
-
-// getGlobalConfigPath returns the global config file path
-// TODO: Remove this function once cli_config_unset.go is updated to use ResolveConfigPaths
-func getGlobalConfigPath() string {
-	_, globalPath, err := ResolveConfigPaths(ScopeGlobal, OpWrite)
-	if err != nil {
-		Fatal("%v", err)
-	}
-	return globalPath
-}

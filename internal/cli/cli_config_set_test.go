@@ -101,28 +101,3 @@ func TestConfigSetGlobalFlagOutsideGit(t *testing.T) {
 		t.Errorf("config set --global should work outside git repo, got error: %v", err)
 	}
 }
-
-func TestConfigSetLocalOutsideGitFails(t *testing.T) {
-	// Save original working directory
-	origWd, _ := os.Getwd()
-	defer os.Chdir(origWd)
-
-	// Change to a temp directory without .git
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to tmp dir: %v", err)
-	}
-
-	// Create command without --global flag (defaults to local)
-	cmd := NewConfigSetCmd()
-	cmd.SetArgs([]string{"tmux.layout", "tiled"})
-
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-
-	// Run command - should fail outside git repo
-	// Note: This test may not work as expected because Fatal() calls os.Exit
-	// In a real test, we'd need to capture the Fatal call
-	// For now, we'll just verify the flag parsing works
-}
