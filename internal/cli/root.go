@@ -4,10 +4,12 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/joebalancio/wt/internal/tmux"
+	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/pkg/executor"
 	"github.com/spf13/cobra"
 )
 
@@ -55,20 +57,29 @@ func GetDryRun() bool {
 	return dryRun
 }
 
-// isInTmux checks if currently running in tmux
-func isInTmux() bool {
-	return tmux.IsInTmux()
+// loadConfigForCommand loads config from flags, returning defaults if not found
+func loadConfigForCommand() (*config.Config, error) {
+	// Check for --config flag
+	customPath, _ := rootCmd.PersistentFlags().GetString("config")
+
+	projectPath, globalPath, err := config.FindConfigs(customPath)
+	if err != nil {
+		// No config found - return defaults
+		return config.DefaultConfig(), nil
+	}
+
+	return config.LoadMerged(projectPath, globalPath)
 }
 
-// shouldCreateTmuxWindow determines if tmux window should be created
-func shouldCreateTmuxWindow(noTmuxFlag bool) bool {
-	if !isInTmux() {
-		return false
+// runSetupHooks executes post-create hooks for a worktree
+func runSetupHooks(ctx context.Context, worktreePath string) error {
+	cfg, err := loadConfigForCommand()
+	if err != nil {
+		return err
 	}
-	if noTmuxFlag {
-		return false
-	}
-	return true
+
+	runner := executor.NewHookRunner(worktreePath)
+	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
 }
 
 // Fatal prints an error and exits with code 1

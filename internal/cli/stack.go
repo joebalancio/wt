@@ -8,7 +8,6 @@ import (
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
 	"github.com/joebalancio/wt/internal/stack"
-	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -138,37 +137,6 @@ func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *
 	createStackTmuxWindow(ctx, cmd, stackService, branchName, worktree.Path)
 }
 
-// createStackTmuxWindow creates a tmux window for the stack branch
-func createStackTmuxWindow(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName, worktreePath string) {
-	if !shouldCreateTmuxWindow(NoTmux()) {
-		return
-	}
-
-	tmuxClient, err := tmux.NewClient()
-	if err != nil {
-		return
-	}
-
-	// Get stack level for window naming
-	stackLevel := getStackLevel(ctx, stackService, branchName)
-
-	windowName := tmux.GenerateStackWindowName(branchName, stackLevel)
-	if err := tmuxClient.CreateOrSelectWindow(windowName, worktreePath); err != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
-	}
-}
-
-// getStackLevel returns the stack level for a given branch name
-func getStackLevel(ctx context.Context, stackService *stack.Service, branchName string) int {
-	stackBranches, _ := stackService.GetStack(ctx)
-	for i, sb := range stackBranches {
-		if sb.Name == branchName {
-			return i
-		}
-	}
-	return 0
-}
-
 // NewStackListCmd creates the stack list subcommand
 func NewStackListCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -243,19 +211,6 @@ func getCurrentBranchProtected(ctx context.Context) (string, error) {
 
 func isProtectedBranch(branch string) bool {
 	return branch == "main" || branch == "master"
-}
-
-func loadConfigForCommand() (*config.Config, error) {
-	// Check for --config flag
-	customPath, _ := rootCmd.PersistentFlags().GetString("config")
-
-	projectPath, globalPath, err := config.FindConfigs(customPath)
-	if err != nil {
-		// No config found - return defaults
-		return config.DefaultConfig(), nil
-	}
-
-	return config.LoadMerged(projectPath, globalPath)
 }
 
 // validateGitSpiceConfig validates git-spice configuration
