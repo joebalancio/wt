@@ -62,8 +62,8 @@ func TestNewConfigSetCmd(t *testing.T) {
 		t.Errorf("expected Use 'set <key> <value>', got %q", cmd.Use)
 	}
 
-	if cmd.Short != "Set a config value (global config only)" {
-		t.Errorf("expected Short 'Set a config value (global config only)', got %q", cmd.Short)
+	if cmd.Short != "Set a config value" {
+		t.Errorf("expected Short 'Set a config value', got %q", cmd.Short)
 	}
 
 	// Test args validation
