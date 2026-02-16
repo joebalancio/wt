@@ -95,11 +95,6 @@ func GetValue(cfg *config.Config, key string) (interface{}, error) {
 	section := parts[0]
 
 	switch section {
-	case "global":
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid key format: %q (global keys are <section>.<field>)", key)
-		}
-		return getGlobalValue(cfg, parts[1])
 	case "worktree":
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid key format: %q (worktree keys are <section>.<field>)", key)
@@ -109,14 +104,6 @@ func GetValue(cfg *config.Config, key string) (interface{}, error) {
 		return getTmuxValue(cfg, parts[1:])
 	default:
 		return nil, fmt.Errorf("unknown section: %s", section)
-	}
-}
-
-// getGlobalValue retrieves a global config value
-func getGlobalValue(cfg *config.Config, field string) (interface{}, error) {
-	switch field {
-	default:
-		return nil, fmt.Errorf("unknown key: global.%s", field)
 	}
 }
 
@@ -193,11 +180,6 @@ func SetValue(cfg *config.Config, key, value string) error {
 	section := parts[0]
 
 	switch section {
-	case "global":
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid key format: %q (global keys are <section>.<field>)", key)
-		}
-		return setGlobalValue(cfg, parts[1], value)
 	case "worktree":
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid key format: %q (worktree keys are <section>.<field>)", key)
@@ -207,14 +189,6 @@ func SetValue(cfg *config.Config, key, value string) error {
 		return setTmuxValue(cfg, parts[1:], value)
 	default:
 		return fmt.Errorf("unknown section: %s", section)
-	}
-}
-
-// setGlobalValue sets a global config value
-func setGlobalValue(cfg *config.Config, field, value string) error {
-	switch field {
-	default:
-		return fmt.Errorf("unknown key: global.%s", field)
 	}
 }
 
@@ -320,11 +294,6 @@ func UnsetValue(cfg *config.Config, key string) error {
 	section := parts[0]
 
 	switch section {
-	case "global":
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid key format: %q (global keys are <section>.<field>)", key)
-		}
-		return unsetGlobalValue(cfg, parts[1])
 	case "worktree":
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid key format: %q (worktree keys are <section>.<field>)", key)
@@ -334,14 +303,6 @@ func UnsetValue(cfg *config.Config, key string) error {
 		return unsetTmuxValue(cfg, parts[1:])
 	default:
 		return fmt.Errorf("unknown section: %s", section)
-	}
-}
-
-// unsetGlobalValue unsets a global config value to default
-func unsetGlobalValue(cfg *config.Config, field string) error {
-	switch field {
-	default:
-		return fmt.Errorf("unknown key: global.%s", field)
 	}
 }
 
