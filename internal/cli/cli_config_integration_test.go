@@ -87,8 +87,8 @@ func TestNewConfigUnsetCmd(t *testing.T) {
 		t.Errorf("expected Use 'unset <key>', got %q", cmd.Use)
 	}
 
-	if cmd.Short != "Remove a config key (global config only)" {
-		t.Errorf("expected Short 'Remove a config key (global config only)', got %q", cmd.Short)
+	if cmd.Short != "Remove a config key" {
+		t.Errorf("expected Short 'Remove a config key', got %q", cmd.Short)
 	}
 
 	// Test args validation
