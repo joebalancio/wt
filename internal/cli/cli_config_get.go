@@ -111,16 +111,3 @@ func loadMergedConfig(projectPath, globalPath string) (*config.Config, error) {
 	}
 	return config.LoadMerged(projectPath, globalPath)
 }
-
-// loadActiveConfig loads the active config (respects discovery order with merging)
-// This is used by config list command until Task 5 adds its own scope handling
-func loadActiveConfig() (*config.Config, error) {
-	customPath, _ := rootCmd.PersistentFlags().GetString("config")
-
-	projectPath, globalPath, err := config.FindConfigs(customPath)
-	if err != nil {
-		return config.DefaultConfig(), nil
-	}
-
-	return config.LoadMerged(projectPath, globalPath)
-}
