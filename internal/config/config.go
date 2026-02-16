@@ -25,7 +25,6 @@ type Config struct {
 
 // GlobalConfig contains global settings
 type GlobalConfig struct {
-	TmuxSessionPrefix string `yaml:"tmux_session_prefix"`
 }
 
 // HooksConfig defines hook configurations
@@ -92,9 +91,7 @@ type OverrideConfig struct {
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		Global: GlobalConfig{
-			TmuxSessionPrefix: "wt-",
-		},
+		Global: GlobalConfig{},
 		Tmux: TmuxConfig{
 			Layout:         "main-vertical",
 			WindowName:     "work",

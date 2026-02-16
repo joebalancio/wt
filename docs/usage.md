@@ -223,7 +223,6 @@ hooks:
 **NOT IMPLEMENTED - Future Features:**
 
 The following configuration sections are documented but NOT implemented in the current version:
-- `global.tmux_session_prefix` - Tmux integration is planned for a future release
 - `tmux.*` section - All tmux configuration and session management is not yet available
 
 
@@ -251,7 +250,6 @@ wt config <command> [arguments]
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `global.tmux_session_prefix` | string | `wt-` | Prefix for tmux session names |
 | `worktree.location` | string | `dedicated` | Worktree location mode (`dedicated` or `per-repo`) |
 | `worktree.dedicated_path` | string | `~/worktrees` | Path for dedicated mode worktrees |
 | `tmux.layout` | string | `main-vertical` | Default tmux layout |
