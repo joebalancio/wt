@@ -141,9 +141,9 @@ func TestLoadConfigForCommand_NoConfig(t *testing.T) {
 		t.Fatalf("LoadMerged error: %v", err)
 	}
 
-	// Verify defaults
-	if cfg.Worktree.Location != "dedicated" {
-		t.Errorf("Location = %q, want dedicated (default)", cfg.Worktree.Location)
+	// Verify defaults - empty location means per-repo (default)
+	if cfg.Worktree.Location != "" {
+		t.Errorf("Location = %q, want empty (per-repo default)", cfg.Worktree.Location)
 	}
 	if cfg.Worktree.GetDedicatedPath() != "~/worktrees" {
 		t.Errorf("GetDedicatedPath() = %q, want ~/worktrees (default)", cfg.Worktree.GetDedicatedPath())

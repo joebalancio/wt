@@ -194,7 +194,7 @@ func UnsetValue(cfg *config.Config, key string) error {
 func unsetWorktreeValue(cfg *config.Config, field string) error {
 	switch field {
 	case "location":
-		cfg.Worktree.Location = "dedicated" // default
+		cfg.Worktree.Location = "" // empty means per-repo (default)
 		return nil
 	case "dedicated_path":
 		cfg.Worktree.DedicatedPath = "" // empty triggers default in GetDedicatedPath()
