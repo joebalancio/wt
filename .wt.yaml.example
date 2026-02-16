@@ -7,10 +7,6 @@
 #   - Arrays (hooks): project array replaces global entirely
 #   - Undefined fields: inherit from global
 
-global:
-  # Prefix for tmux session names
-  tmux_session_prefix: "wt-"
-
 # Hooks run automatically after worktree operations
 # NOTE: These are global defaults. Override in .wt.yaml for project-specific hooks.
 hooks:
