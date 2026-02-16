@@ -17,7 +17,6 @@ hooks:
   on_worktree_create:
     - run: "make build"
       cwd: "{worktree_path}"
-      background: true
 
   on_worktree_remove:
     # Example: Clean up on remove
@@ -70,7 +69,6 @@ worktree:
 #       cwd: "{worktree_path}"
 #     - run: "cargo build"
 #       cwd: "{worktree_path}"
-#       background: true
 #
 # tmux:
 #   attach_on_create: false  # Override global setting

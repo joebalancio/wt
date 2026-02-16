@@ -37,10 +37,8 @@ type HooksConfig struct {
 
 // Hook represents a single command to run
 type Hook struct {
-	Run        string `yaml:"run"`
-	Cwd        string `yaml:"cwd,omitempty"`
-	Background bool   `yaml:"background,omitempty"`
-	Parallel   bool   `yaml:"parallel,omitempty"`
+	Run string `yaml:"run"`
+	Cwd string `yaml:"cwd,omitempty"`
 }
 
 // TmuxConfig contains tmux-specific settings

@@ -279,13 +279,10 @@ Both services use the same logic: check `cfg.Worktree.IsDedicated()` and call `c
 Hooks are defined in config with these fields:
 - `run`: Command to execute
 - `cwd`: Working directory (supports `{worktree_path}` template)
-- `background`: Run asynchronously
-- `parallel`: Can run with other parallel hooks
 
 The executor (`pkg/executor/`) handles:
 - Context cancellation
 - Per-hook timeout (default 5 minutes)
-- Parallel execution
 - Output capture
 
 **4. Global CLI State**

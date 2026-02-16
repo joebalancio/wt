@@ -101,28 +101,3 @@ func (e *Executor) Run(ctx context.Context, workdir string, command string) *Hoo
 
 	return result
 }
-
-// RunParallel executes multiple hooks in parallel
-func (e *Executor) RunParallel(ctx context.Context, hooks []HookDefinition) []HookResult {
-	results := make([]HookResult, len(hooks))
-	resultChan := make(chan *HookResult, len(hooks))
-
-	for i, hook := range hooks {
-		go func(_ int, h HookDefinition) {
-			resultChan <- e.Run(ctx, h.Workdir, h.Command)
-		}(i, hook)
-	}
-
-	for i := 0; i < len(hooks); i++ {
-		result := <-resultChan
-		results[i] = *result
-	}
-
-	return results
-}
-
-// HookDefinition represents a hook to execute
-type HookDefinition struct {
-	Command string
-	Workdir string
-}
