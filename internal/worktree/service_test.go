@@ -3,6 +3,8 @@ package worktree
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -941,4 +943,87 @@ func TestService_Done(t *testing.T) {
 			t.Fatalf("Done() error = %v", err)
 		}
 	})
+}
+
+func TestResolvePath_CollisionDetection(t *testing.T) {
+	// Create a temp directory to simulate existing worktree from different repo
+	tempDir := t.TempDir()
+	// The target path will be <dedicatedPath>/<repoName>/<branch>
+	// If the repo name is "my-repo" and branch is "feature/auth",
+	// the path will be <tempDir>/my-repo/feature/auth
+	existingPath := filepath.Join(tempDir, "my-repo", "feature", "auth")
+	if err := os.MkdirAll(existingPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a .git file to simulate worktree pointing to different repo
+	// The .git file points to a DIFFERENT repo than the current one
+	gitFile := filepath.Join(existingPath, ".git")
+	if err := os.WriteFile(gitFile, []byte("gitdir: /some/other/path/my-repo/.git/worktrees/feature/auth"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mockGit := &mockGitClient{
+		getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+			// Current repo is different from the one that created the worktree
+			// The repoName extracted from this path will be "my-repo"
+			// So targetPath will be <tempDir>/my-repo/feature/auth
+			return &domain.GitRepo{RootPath: "/home/user/projects/my-repo", DefaultBranch: "main"}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+	cfg.Worktree.Location = "dedicated"
+	cfg.Worktree.DedicatedPath = tempDir
+
+	svc, err := NewService(mockGit, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = svc.ResolvePath(context.Background(), "feature/auth", "")
+	if err == nil {
+		t.Error("ResolvePath() expected collision error, got nil")
+	}
+	if err != nil && !strings.Contains(err.Error(), "collision") {
+		t.Errorf("ResolvePath() error should mention collision, got: %v", err)
+	}
+}
+
+func TestResolvePath_SameRepo_NoCollision(t *testing.T) {
+	// Create a temp directory to simulate existing worktree from SAME repo
+	tempDir := t.TempDir()
+	// The target path will be <tempDir>/my-repo/feature/auth
+	existingPath := filepath.Join(tempDir, "my-repo", "feature", "auth")
+	if err := os.MkdirAll(existingPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a .git file pointing to the SAME repo as current
+	gitFile := filepath.Join(existingPath, ".git")
+	if err := os.WriteFile(gitFile, []byte("gitdir: /home/user/projects/my-repo/.git/worktrees/feature/auth"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mockGit := &mockGitClient{
+		getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+			// Current repo is the SAME as the one that created the worktree
+			return &domain.GitRepo{RootPath: "/home/user/projects/my-repo", DefaultBranch: "main"}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+	cfg.Worktree.Location = "dedicated"
+	cfg.Worktree.DedicatedPath = tempDir
+
+	svc, err := NewService(mockGit, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := svc.ResolvePath(context.Background(), "feature/auth", "")
+	if err != nil {
+		t.Errorf("ResolvePath() unexpected error: %v", err)
+	}
+	if path != existingPath {
+		t.Errorf("ResolvePath() = %q, want %q", path, existingPath)
+	}
 }

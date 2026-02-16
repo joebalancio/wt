@@ -17,6 +17,9 @@ import (
 	"github.com/joebalancio/wt/pkg/executor"
 )
 
+// ErrPathCollision is returned when a worktree path already exists from a different repo
+var ErrPathCollision = errors.New("path collision detected")
+
 // Service provides worktree management operations
 type Service struct {
 	git git.GitClient
@@ -106,8 +109,14 @@ func (s *Service) ResolvePath(ctx context.Context, branch string, explicitPath s
 			return "", fmt.Errorf("getting repo info: %w", err)
 		}
 		repoName := filepath.Base(repoInfo.RootPath)
+		targetPath := filepath.Join(dedicatedPath, repoName, branch)
 
-		return filepath.Join(dedicatedPath, repoName, branch), nil
+		// Check for collision
+		if err := s.checkPathCollision(targetPath, repoInfo.RootPath); err != nil {
+			return "", err
+		}
+
+		return targetPath, nil
 	}
 
 	// per-repo mode
@@ -116,6 +125,62 @@ func (s *Service) ResolvePath(ctx context.Context, branch string, explicitPath s
 		return "", fmt.Errorf("getting repo info: %w", err)
 	}
 	return filepath.Join(repoInfo.RootPath, ".worktrees", branch), nil
+}
+
+// checkPathCollision verifies the target path doesn't exist from a different repo
+func (s *Service) checkPathCollision(targetPath, currentRepoRoot string) error {
+	// If path doesn't exist, no collision
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return nil
+	}
+
+	// Path exists - check if it's from the same repo
+	existingRepo, err := s.getWorktreeOriginRepo(targetPath)
+	if err != nil {
+		// Can't determine origin, allow it (existing behavior)
+		return nil
+	}
+
+	// Compare repo roots
+	if existingRepo != "" && existingRepo != currentRepoRoot {
+		return fmt.Errorf("%w: %s already exists from another repo (%s)\n\nOptions:\n  --path <explicit-path>  # specify a different path\n  wt config set worktree.location per-repo  # use per-repo mode",
+			ErrPathCollision, targetPath, existingRepo)
+	}
+
+	return nil
+}
+
+// getWorktreeOriginRepo reads the .git file in a worktree to find the origin repo path
+func (s *Service) getWorktreeOriginRepo(worktreePath string) (string, error) {
+	gitFile := filepath.Join(worktreePath, ".git")
+	data, err := os.ReadFile(gitFile)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse gitdir line: "gitdir: /path/to/repo/.git/worktrees/branch"
+	content := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(content, "gitdir: ") {
+		return "", fmt.Errorf("invalid .git file format")
+	}
+
+	gitdir := strings.TrimPrefix(content, "gitdir: ")
+
+	// Extract repo root from gitdir
+	// gitdir is typically: /path/to/repo/.git/worktrees/branch
+	// We need: /path/to/repo
+	parts := strings.Split(gitdir, string(filepath.Separator))
+	for i, part := range parts {
+		if part == ".git" {
+			repoPath := filepath.Join(parts[:i]...)
+			if repoPath == "" {
+				return "/", nil
+			}
+			return "/" + repoPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not parse repo path from gitdir: %s", gitdir)
 }
 
 // Remove removes a worktree
