@@ -91,7 +91,6 @@ wt config validate
 ```
 
 **Supported keys:**
-- `global.tmux_session_prefix` - Tmux session prefix
 - `worktree.location` - Worktree location mode (dedicated/per-repo)
 - `worktree.dedicated_path` - Path for dedicated mode
 - `tmux.layout` - Default tmux layout
