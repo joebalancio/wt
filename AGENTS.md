@@ -93,11 +93,6 @@ wt config validate
 **Supported keys:**
 - `worktree.location` - Worktree location mode (dedicated/per-repo)
 - `worktree.dedicated_path` - Path for dedicated mode
-- `tmux.layout` - Default tmux layout
-- `tmux.window_name` - Default tmux window name
-- `tmux.attach_on_create` - Attach to tmux on worktree creation (boolean)
-- `tmux.window_naming.max_length` - Maximum length for tmux window names (integer, 1-32)
-- `tmux.window_naming.abbreviate_issue_id` - Abbreviate issue IDs in window names (boolean)
 
 **Boolean values accepted:** `true`, `false`, `1`, `0`, `yes`, `no` (case-insensitive)
 

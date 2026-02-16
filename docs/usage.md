@@ -198,17 +198,6 @@ hooks:
   on_worktree_remove:
     - run: "rm -rf node_modules"
       cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
-
-# Project-specific configuration
-# DEPRECATED: Use .wt.yaml in the repository root instead
-# The project_overrides field is kept for backward compatibility but is no longer used.
-# To configure project-specific hooks, create a .wt.yaml file in the repository root.
-# project_overrides:
-#   - match: "**/*rust*"                 # Matches projects with "rust" in path
-#     hooks:
-#       on_worktree_create:
-#         - run: "cargo fetch"
-#           cwd: "{worktree_path}"
 ```
 
 **Worktree Location Modes:**
@@ -219,11 +208,6 @@ hooks:
 **IMPORTANT LIMITATIONS:**
 
 - **Hook Template Expansion**: The `{worktree_path}` template is NOT yet implemented. When specifying `cwd`, use absolute paths or relative paths from your current directory. This feature is planned for a future release.
-
-**NOT IMPLEMENTED - Future Features:**
-
-The following configuration sections are documented but NOT implemented in the current version:
-- `tmux.*` section - All tmux configuration and session management is not yet available
 
 
 ### wt config
@@ -252,11 +236,6 @@ wt config <command> [arguments]
 |-----|------|---------|-------------|
 | `worktree.location` | string | `dedicated` | Worktree location mode (`dedicated` or `per-repo`) |
 | `worktree.dedicated_path` | string | `~/worktrees` | Path for dedicated mode worktrees |
-| `tmux.layout` | string | `main-vertical` | Default tmux layout |
-| `tmux.window_name` | string | `work` | Default tmux window name |
-| `tmux.attach_on_create` | bool | `true` | Attach to tmux session on worktree creation |
-| `tmux.window_naming.max_length` | int | `16` | Maximum length for tmux window names |
-| `tmux.window_naming.abbreviate_issue_id` | bool | `true` | Abbreviate issue IDs in window names |
 
 **Examples:**
 
@@ -286,14 +265,7 @@ wt config unset worktree.dedicated_path
 
 **Boolean Values:**
 
-When setting boolean values, the following inputs are accepted:
-- `true`: `true`, `1`, `yes`, `on` (case-insensitive)
-- `false`: `false`, `0`, `no`, `off` (case-insensitive)
-
-```bash
-wt config set tmux.attach_on_create false
-wt config set tmux.attach_on_create yes   # Sets to true
-```
+Boolean values accept: `true`, `false`, `1`, `0`, `yes`, `no` (case-insensitive).
 
 **Error Handling:**
 
@@ -302,10 +274,6 @@ wt config set tmux.attach_on_create yes   # Sets to true
 wt config set worktree.location invalid
 # Error: invalid value "invalid" for worktree.location
 #        Valid values: dedicated, per-repo
-
-# Invalid boolean
-wt config set tmux.attach_on_create maybe
-# Error: invalid boolean value: "maybe" (use: true, false, 1, 0, yes, no)
 
 # Unsupported key
 wt config set hooks.on_worktree_create "echo hi"
@@ -316,7 +284,6 @@ wt config set hooks.on_worktree_create "echo hi"
 **Notes:**
 - `set` and `unset` commands always modify the global config (`~/.config/wt/config.yaml`)
 - For hooks, edit the config file directly (project-local `.wt.yaml` or global config)
-- `project_overrides` is deprecated; use project-local `.wt.yaml` files instead
 - `get` and `list` respect the config discovery order (flag → local → global)
 
 ---

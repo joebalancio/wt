@@ -13,21 +13,21 @@ func TestLoadMerged(t *testing.T) {
 		name                 string
 		globalYAML           string
 		projectYAML          string
-		wantLayout           string // empty means don't check
-		wantAttachOnCreate   *bool  // nil means don't check
+		wantLocation         string // empty means don't check
+		wantDedicatedPath    string // empty means don't check
 		wantOnWorktreeCreate []Hook // nil means don't check
 	}{
 		{
 			name: "project scalar overrides global",
 			globalYAML: `
-tmux:
-  attach_on_create: true
+worktree:
+  location: "dedicated"
 `,
 			projectYAML: `
-tmux:
-  attach_on_create: false
+worktree:
+  location: "per-repo"
 `,
-			wantAttachOnCreate: ptrBool(false),
+			wantLocation: "per-repo",
 		},
 		{
 			name: "project array replaces global entirely",
@@ -50,34 +50,34 @@ hooks:
 		{
 			name: "undefined project field inherits global",
 			globalYAML: `
-tmux:
-  layout: "main-horizontal"
-  attach_on_create: true
+worktree:
+  location: "per-repo"
+  dedicated_path: "/custom/path"
 `,
 			projectYAML: `
-tmux:
-  attach_on_create: false
+worktree:
+  location: "dedicated"
 `,
-			wantLayout:         "main-horizontal", // inherited from global
-			wantAttachOnCreate: ptrBool(false),    // overridden by project
+			wantDedicatedPath: "/custom/path", // inherited from global
+			wantLocation:      "dedicated",    // overridden by project
 		},
 		{
 			name:       "project only (no global)",
 			globalYAML: "",
 			projectYAML: `
-tmux:
-  layout: "project-layout"
+worktree:
+  location: "per-repo"
 `,
-			wantLayout: "project-layout",
+			wantLocation: "per-repo",
 		},
 		{
 			name: "global only (no project)",
 			globalYAML: `
-tmux:
-  layout: "global-layout"
+worktree:
+  location: "per-repo"
 `,
-			projectYAML: "",
-			wantLayout:  "global-layout",
+			projectYAML:  "",
+			wantLocation: "per-repo",
 		},
 	}
 
@@ -109,11 +109,11 @@ tmux:
 			}
 
 			// Compare only the fields we care about
-			if tt.wantLayout != "" && cfg.Tmux.Layout != tt.wantLayout {
-				t.Errorf("Tmux.Layout = %q, want %q", cfg.Tmux.Layout, tt.wantLayout)
+			if tt.wantLocation != "" && cfg.Worktree.Location != tt.wantLocation {
+				t.Errorf("Worktree.Location = %q, want %q", cfg.Worktree.Location, tt.wantLocation)
 			}
-			if tt.wantAttachOnCreate != nil && cfg.Tmux.AttachOnCreate != *tt.wantAttachOnCreate {
-				t.Errorf("Tmux.AttachOnCreate = %v, want %v", cfg.Tmux.AttachOnCreate, *tt.wantAttachOnCreate)
+			if tt.wantDedicatedPath != "" && cfg.Worktree.DedicatedPath != tt.wantDedicatedPath {
+				t.Errorf("Worktree.DedicatedPath = %q, want %q", cfg.Worktree.DedicatedPath, tt.wantDedicatedPath)
 			}
 			if tt.wantOnWorktreeCreate != nil {
 				if len(cfg.Hooks.OnWorktreeCreate) != len(tt.wantOnWorktreeCreate) {
@@ -133,11 +133,6 @@ tmux:
 			}
 		})
 	}
-}
-
-// ptrBool returns a pointer to a bool value
-func ptrBool(v bool) *bool {
-	return &v
 }
 
 func TestWorktreeConfig_IsDedicated(t *testing.T) {
@@ -194,17 +189,6 @@ func TestSpiceConfig_DefaultValues(t *testing.T) {
 
 	if cfg.Spice.BinaryPath != "" {
 		t.Errorf("expected empty BinaryPath, got %q", cfg.Spice.BinaryPath)
-	}
-}
-
-func TestTmuxWindowNamingConfig_DefaultValues(t *testing.T) {
-	cfg := DefaultConfig()
-
-	if cfg.Tmux.WindowNaming.MaxLength != 16 {
-		t.Errorf("expected MaxLength = 16, got %d", cfg.Tmux.WindowNaming.MaxLength)
-	}
-	if cfg.Tmux.WindowNaming.AbbreviateIssueID != true {
-		t.Errorf("expected AbbreviateIssueID = true, got %v", cfg.Tmux.WindowNaming.AbbreviateIssueID)
 	}
 }
 

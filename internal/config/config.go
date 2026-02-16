@@ -1,6 +1,6 @@
 // Package config handles YAML configuration loading, validation, and discovery for wt.
 // Configuration is loaded from .wt.yaml in the current directory or ~/.config/wt/config.yaml
-// following XDG standards, with support for hooks, tmux settings, and worktree location modes.
+// following XDG standards, with support for hooks and worktree location modes.
 package config
 
 import (
@@ -15,16 +15,9 @@ import (
 
 // Config represents the main configuration structure
 type Config struct {
-	Global    GlobalConfig     `yaml:"global"`
-	Hooks     HooksConfig      `yaml:"hooks"`
-	Tmux      TmuxConfig       `yaml:"tmux"`
-	Worktree  WorktreeConfig   `yaml:"worktree"`
-	Spice     SpiceConfig      `yaml:"spice"`
-	Overrides []OverrideConfig `yaml:"project_overrides,omitempty"`
-}
-
-// GlobalConfig contains global settings
-type GlobalConfig struct {
+	Hooks    HooksConfig    `yaml:"hooks"`
+	Worktree WorktreeConfig `yaml:"worktree"`
+	Spice    SpiceConfig    `yaml:"spice"`
 }
 
 // HooksConfig defines hook configurations
@@ -38,20 +31,6 @@ type HooksConfig struct {
 type Hook struct {
 	Run string `yaml:"run"`
 	Cwd string `yaml:"cwd,omitempty"`
-}
-
-// TmuxConfig contains tmux-specific settings
-type TmuxConfig struct {
-	Layout         string                 `yaml:"layout,omitempty"`
-	WindowName     string                 `yaml:"window_name,omitempty"`
-	AttachOnCreate bool                   `yaml:"attach_on_create,omitempty"`
-	WindowNaming   TmuxWindowNamingConfig `yaml:"window_naming,omitempty"`
-}
-
-// TmuxWindowNamingConfig contains window naming configuration
-type TmuxWindowNamingConfig struct {
-	MaxLength         int  `yaml:"max_length,omitempty"`
-	AbbreviateIssueID bool `yaml:"abbreviate_issue_id,omitempty"`
 }
 
 // WorktreeConfig contains worktree-specific settings
@@ -78,29 +57,9 @@ func (w *WorktreeConfig) GetDedicatedPath() string {
 	return "~/worktrees" // default
 }
 
-// OverrideConfig allows project-specific overrides
-//
-// Deprecated: Use project-local .wt.yaml files instead.
-// This field is kept for backward compatibility but is no longer actively used.
-// Project-specific hooks should be defined in a .wt.yaml file at the repository root.
-type OverrideConfig struct {
-	Match string      `yaml:"match"`
-	Hooks HooksConfig `yaml:"hooks,omitempty"`
-}
-
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		Global: GlobalConfig{},
-		Tmux: TmuxConfig{
-			Layout:         "main-vertical",
-			WindowName:     "work",
-			AttachOnCreate: true,
-			WindowNaming: TmuxWindowNamingConfig{
-				MaxLength:         16,
-				AbbreviateIssueID: true,
-			},
-		},
 		Worktree: WorktreeConfig{
 			Location:      "dedicated",
 			DedicatedPath: "~/worktrees",

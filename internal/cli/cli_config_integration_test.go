@@ -135,9 +135,7 @@ func TestGetCommandIntegration(t *testing.T) {
 		expected string
 	}{
 		{"worktree.location", "dedicated"},
-		{"tmux.attach_on_create", "true"},
-		{"tmux.layout", "main-vertical"},
-		{"tmux.window_name", "work"},
+		{"worktree.dedicated_path", "~/worktrees"},
 	}
 
 	for _, tt := range tests {
@@ -198,26 +196,6 @@ func TestSetUnsetIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("set boolean value", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-
-		// Set to false
-		if err := SetValue(cfg, "tmux.attach_on_create", "false"); err != nil {
-			t.Fatalf("SetValue error: %v", err)
-		}
-		if cfg.Tmux.AttachOnCreate != false {
-			t.Errorf("expected AttachOnCreate false, got %v", cfg.Tmux.AttachOnCreate)
-		}
-
-		// Set to true
-		if err := SetValue(cfg, "tmux.attach_on_create", "yes"); err != nil {
-			t.Fatalf("SetValue error: %v", err)
-		}
-		if cfg.Tmux.AttachOnCreate != true {
-			t.Errorf("expected AttachOnCreate true, got %v", cfg.Tmux.AttachOnCreate)
-		}
-	})
-
 	t.Run("invalid value is rejected", func(t *testing.T) {
 		cfg := config.DefaultConfig()
 
@@ -258,8 +236,5 @@ func TestListOutput(t *testing.T) {
 	// Verify config has expected values
 	if cfg.Worktree.Location == "" {
 		t.Error("expected Worktree.Location to be set")
-	}
-	if cfg.Tmux.Layout == "" {
-		t.Error("expected Tmux.Layout to be set")
 	}
 }
