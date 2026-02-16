@@ -150,7 +150,17 @@ func (s *Service) GetWorktreePathForBranch(ctx context.Context, branch string) (
 // getWorktreePath returns the worktree path for a branch
 func (s *Service) getWorktreePath(ctx context.Context, branch string) string {
 	if s.cfg.Worktree.IsDedicated() {
-		return filepath.Join(s.cfg.Worktree.GetDedicatedPath(), branch)
+		dedicatedPath := s.cfg.Worktree.GetDedicatedPath()
+
+		// Get repo info for namespace
+		repoInfo, err := s.git.GetRepoInfo(ctx)
+		if err != nil || repoInfo == nil {
+			// Fallback: use branch only if we can't get repo info
+			return filepath.Join(dedicatedPath, branch)
+		}
+		repoName := filepath.Base(repoInfo.RootPath)
+
+		return filepath.Join(dedicatedPath, repoName, branch)
 	}
 	// per-repo mode - get repo info safely
 	repoInfo, err := s.git.GetRepoInfo(ctx)

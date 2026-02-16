@@ -141,7 +141,7 @@ func TestWorktreeConfig_IsDedicated(t *testing.T) {
 		location string
 		want     bool
 	}{
-		{"empty defaults to dedicated", "", true},
+		{"empty defaults to per-repo", "", false},
 		{"explicit dedicated", "dedicated", true},
 		{"per-repo", "per-repo", false},
 	}
@@ -176,11 +176,8 @@ func TestWorktreeConfig_GetDedicatedPath(t *testing.T) {
 
 func TestDefaultConfig_HasWorktreeSettings(t *testing.T) {
 	cfg := DefaultConfig()
-	if !cfg.Worktree.IsDedicated() {
-		t.Error("default config should use dedicated worktree location")
-	}
-	if cfg.Worktree.GetDedicatedPath() != "~/worktrees" {
-		t.Errorf("default dedicated path = %v, want ~/worktrees", cfg.Worktree.GetDedicatedPath())
+	if cfg.Worktree.IsDedicated() {
+		t.Error("default config should use per-repo worktree location")
 	}
 }
 

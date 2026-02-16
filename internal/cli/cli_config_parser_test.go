@@ -19,7 +19,7 @@ func TestGetValue(t *testing.T) {
 		expected  string
 		wantError bool
 	}{
-		{"worktree location", "worktree.location", "dedicated", false},
+		{"worktree location", "worktree.location", "", false}, // empty means per-repo (default)
 		{"worktree dedicated_path", "worktree.dedicated_path", "~/worktrees", false},
 		{"invalid key format", "invalid", "", true},
 		{"unsupported key", "hooks.on_worktree_create", "", true},
@@ -83,8 +83,8 @@ func TestUnsetValue(t *testing.T) {
 			key:       "worktree.location",
 			wantError: false,
 			validate: func(cfg *config.Config) {
-				if cfg.Worktree.Location != "dedicated" {
-					t.Errorf("expected default 'dedicated', got %q", cfg.Worktree.Location)
+				if cfg.Worktree.Location != "" {
+					t.Errorf("expected default '' (per-repo), got %q", cfg.Worktree.Location)
 				}
 			},
 		},
