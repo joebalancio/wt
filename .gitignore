@@ -46,4 +46,4 @@ tmp/
 .worktrees/
 
 # wt - project-local config
-.wt.yaml
+.wt.local.yaml
