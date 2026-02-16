@@ -2,7 +2,7 @@
 
 **Issue:** wt-j62
 **Date:** 2026-02-16
-**Status:** Design
+**Status:** Implemented
 
 ## Overview
 
