@@ -2,8 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/joebalancio/wt/internal/config"
 	"github.com/spf13/cobra"
@@ -11,16 +9,41 @@ import (
 
 // NewConfigSetCmd creates the config set command
 func NewConfigSetCmd() *cobra.Command {
-	return &cobra.Command{
+	var global bool
+
+	cmd := &cobra.Command{
 		Use:   "set <key> <value>",
-		Short: "Set a config value (global config only)",
-		Args:  cobra.ExactArgs(2),
+		Short: "Set a config value",
+		Long: `Set a config value.
+
+By default, values are set in the project-local config (.wt.yaml).
+Use --global to set values in the global config (~/.config/wt/config.yaml).`,
+		Args: cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			key := args[0]
 			value := args[1]
 
-			// Always use global config path
-			cfgPath := getGlobalConfigPath()
+			// Determine scope based on flag
+			scope := ScopeMerged // Default: write to local
+			if global {
+				scope = ScopeGlobal
+			}
+
+			// Get config paths
+			projectPath, globalPath, err := ResolveConfigPaths(scope, OpWrite)
+			if err != nil {
+				Fatal("%v", err)
+			}
+
+			// Determine which path to use
+			var cfgPath string
+			if global {
+				cfgPath = globalPath
+			} else {
+				cfgPath = projectPath
+			}
+
+			// Load or create config
 			cfg, err := loadOrCreateConfig(cfgPath)
 			if err != nil {
 				Fatal("loading config: %v", err)
@@ -41,22 +64,20 @@ func NewConfigSetCmd() *cobra.Command {
 				Fatal("saving config: %v", err)
 			}
 
+			scopeLabel := "local"
+			if global {
+				scopeLabel = "global"
+			}
 			if _, err := fmt.Fprintf(cmd.OutOrStdout(),
-				"✓ Updated %s: %s in %s\n", key, value, cfgPath); err != nil {
+				"✓ Updated %s: %s in %s (%s)\n", key, value, cfgPath, scopeLabel); err != nil {
 				Fatal("Failed to write output: %v", err)
 			}
 		},
 	}
-}
 
-// getGlobalConfigPath returns the global config file path
-func getGlobalConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		// Fallback to environment variable
-		home = os.Getenv("HOME")
-	}
-	return filepath.Join(home, ".config", "wt", "config.yaml")
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "modify global config instead of project-local")
+
+	return cmd
 }
 
 // loadOrCreateConfig loads an existing config or creates a default one

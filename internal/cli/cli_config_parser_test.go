@@ -1,6 +1,10 @@
 package cli
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/joebalancio/wt/internal/config"
@@ -375,6 +379,186 @@ func TestParseInt(t *testing.T) {
 			}
 			if result != tt.expected {
 				t.Errorf("parseInt() = %d, want %d", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestResolveConfigPaths(t *testing.T) {
+	// Save original working directory
+	origWd, _ := os.Getwd()
+	defer os.Chdir(origWd)
+
+	// Create a temp git repo for testing
+	tmpDir := t.TempDir()
+	// Initialize a real git repository
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("initializing git repo: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to tmp dir: %v", err)
+	}
+
+	// Get expected global path
+	home, _ := os.UserHomeDir()
+	expectedGlobalPath := filepath.Join(home, ".config", "wt", "config.yaml")
+	expectedProjectPath := filepath.Join(tmpDir, ".wt.yaml")
+
+	// Check if global config actually exists
+	globalConfigExists := false
+	if _, err := os.Stat(expectedGlobalPath); err == nil {
+		globalConfigExists = true
+	}
+
+	tests := []struct {
+		name           string
+		scope          ConfigScope
+		op             Operation
+		wantProject    string
+		wantGlobal     string
+		wantGlobalFunc func() string // Used when global path depends on environment
+		wantError      bool
+		errorContains  string
+	}{
+		{
+			name:        "ScopeGlobal returns global path only",
+			scope:       ScopeGlobal,
+			op:          OpRead,
+			wantProject: "",
+			wantGlobal:  expectedGlobalPath,
+			wantError:   false,
+		},
+		{
+			name:        "ScopeLocal read inside git repo",
+			scope:       ScopeLocal,
+			op:          OpRead,
+			wantProject: expectedProjectPath,
+			wantGlobal:  "",
+			wantError:   false,
+		},
+		{
+			name:        "ScopeLocal write inside git repo",
+			scope:       ScopeLocal,
+			op:          OpWrite,
+			wantProject: expectedProjectPath,
+			wantGlobal:  "",
+			wantError:   false,
+		},
+		{
+			name:      "ScopeMerged read calls FindConfigs",
+			scope:     ScopeMerged,
+			op:        OpRead,
+			wantError: false,
+			wantGlobalFunc: func() string {
+				if globalConfigExists {
+					return expectedGlobalPath
+				}
+				return ""
+			},
+		},
+		{
+			name:        "ScopeMerged write defaults to local",
+			scope:       ScopeMerged,
+			op:          OpWrite,
+			wantProject: expectedProjectPath,
+			wantGlobal:  "",
+			wantError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			projectPath, globalPath, err := ResolveConfigPaths(tt.scope, tt.op)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ResolveConfigPaths() expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ResolveConfigPaths() unexpected error: %v", err)
+				return
+			}
+			if projectPath != tt.wantProject {
+				t.Errorf("ResolveConfigPaths() projectPath = %q, want %q", projectPath, tt.wantProject)
+			}
+			expectedGlobal := tt.wantGlobal
+			if tt.wantGlobalFunc != nil {
+				expectedGlobal = tt.wantGlobalFunc()
+			}
+			if globalPath != expectedGlobal {
+				t.Errorf("ResolveConfigPaths() globalPath = %q, want %q", globalPath, expectedGlobal)
+			}
+		})
+	}
+}
+
+func TestResolveConfigPathsOutsideGit(t *testing.T) {
+	// Save original working directory
+	origWd, _ := os.Getwd()
+	defer os.Chdir(origWd)
+
+	// Change to a temp directory without .git
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to tmp dir: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		scope         ConfigScope
+		op            Operation
+		wantError     bool
+		errorContains string
+	}{
+		{
+			name:          "ScopeLocal read outside git repo errors",
+			scope:         ScopeLocal,
+			op:            OpRead,
+			wantError:     true,
+			errorContains: "not in a git repository",
+		},
+		{
+			name:          "ScopeLocal write outside git repo errors",
+			scope:         ScopeLocal,
+			op:            OpWrite,
+			wantError:     true,
+			errorContains: "not in a git repository",
+		},
+		{
+			name:          "ScopeMerged write outside git repo errors",
+			scope:         ScopeMerged,
+			op:            OpWrite,
+			wantError:     true,
+			errorContains: "not in a git repository",
+		},
+		{
+			name:      "ScopeGlobal works outside git repo",
+			scope:     ScopeGlobal,
+			op:        OpWrite,
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := ResolveConfigPaths(tt.scope, tt.op)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ResolveConfigPaths() expected error, got nil")
+					return
+				}
+				if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("ResolveConfigPaths() error = %q, want containing %q", err.Error(), tt.errorContains)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ResolveConfigPaths() unexpected error: %v", err)
 			}
 		})
 	}

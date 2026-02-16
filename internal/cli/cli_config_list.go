@@ -10,15 +10,27 @@ import (
 
 // NewConfigListCmd creates the config list command
 func NewConfigListCmd() *cobra.Command {
-	return &cobra.Command{
+	var local, global bool
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all config values",
-		Args:  cobra.NoArgs,
+		Long: `List all config values.
+
+By default, shows the merged config (project-local > global > defaults).
+Use --local to show only project-local config.
+Use --global to show only global config.`,
+		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			cfg, err := loadActiveConfig()
-			if err != nil {
-				Fatal("loading config: %v", err)
+			// Determine scope
+			scope := ScopeMerged // Default: merged read
+			if local {
+				scope = ScopeLocal
+			} else if global {
+				scope = ScopeGlobal
 			}
+
+			cfg := loadConfigForScope(scope)
 
 			// Explicitly reference config package to ensure import is used
 			_ = configpkg.DefaultConfig
@@ -33,4 +45,10 @@ func NewConfigListCmd() *cobra.Command {
 			}
 		},
 	}
+
+	cmd.Flags().BoolVarP(&local, "local", "l", false, "show project-local config only")
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "show global config only")
+	cmd.MarkFlagsMutuallyExclusive("local", "global")
+
+	return cmd
 }

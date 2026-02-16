@@ -25,13 +25,13 @@ tmux:
   attach_on_create: false
 `
 	projectPath := filepath.Join(tempDir, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create global config
 	globalDir := filepath.Join(tempDir, ".config", "wt")
-	os.MkdirAll(globalDir, 0755)
+	os.MkdirAll(globalDir, 0o755)
 	globalConfig := `
 hooks:
   on_worktree_create:
@@ -41,7 +41,7 @@ tmux:
   attach_on_create: true
 `
 	globalPath := filepath.Join(globalDir, "config.yaml")
-	if err := os.WriteFile(globalPath, []byte(globalConfig), 0644); err != nil {
+	if err := os.WriteFile(globalPath, []byte(globalConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +86,7 @@ tmux:
   layout: "even-horizontal"
 `
 	projectPath := filepath.Join(tempDir, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -117,13 +117,13 @@ func TestLoadConfigForCommand_GlobalOnly(t *testing.T) {
 
 	// Create global config only
 	globalDir := filepath.Join(tempDir, ".config", "wt")
-	os.MkdirAll(globalDir, 0755)
+	os.MkdirAll(globalDir, 0o755)
 	globalConfig := `
 tmux:
   layout: "main-horizontal"
 `
 	globalPath := filepath.Join(globalDir, "config.yaml")
-	if err := os.WriteFile(globalPath, []byte(globalConfig), 0644); err != nil {
+	if err := os.WriteFile(globalPath, []byte(globalConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -90,7 +90,7 @@ tmux:
 			// Write global config if provided
 			if tt.globalYAML != "" {
 				globalPath = filepath.Join(tempDir, "global.yaml")
-				if err := os.WriteFile(globalPath, []byte(tt.globalYAML), 0644); err != nil {
+				if err := os.WriteFile(globalPath, []byte(tt.globalYAML), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -98,7 +98,7 @@ tmux:
 			// Write project config if provided
 			if tt.projectYAML != "" {
 				projectPath = filepath.Join(tempDir, "project.yaml")
-				if err := os.WriteFile(projectPath, []byte(tt.projectYAML), 0644); err != nil {
+				if err := os.WriteFile(projectPath, []byte(tt.projectYAML), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -303,7 +303,7 @@ func TestFindConfigs(t *testing.T) {
 				runGitCommand(t, dir, "config", "user.email", "test@test.com")
 				runGitCommand(t, dir, "config", "user.name", "Test")
 				// Create .wt.yaml at root
-				if err := os.WriteFile(filepath.Join(dir, ".wt.yaml"), []byte("tmux:\n  layout: test\n"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(dir, ".wt.yaml"), []byte("tmux:\n  layout: test\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 				// Set HOME to temp dir (no global config there)
@@ -319,9 +319,9 @@ func TestFindConfigs(t *testing.T) {
 			setupFunc: func(_ *testing.T, dir string) string {
 				// Create global config in temp location
 				globalDir := filepath.Join(dir, ".config", "wt")
-				os.MkdirAll(globalDir, 0755)
+				os.MkdirAll(globalDir, 0o755)
 				globalPath := filepath.Join(globalDir, "config.yaml")
-				os.WriteFile(globalPath, []byte("tmux:\n  layout: global\n"), 0644)
+				os.WriteFile(globalPath, []byte("tmux:\n  layout: global\n"), 0o644)
 				// Set XDG_CONFIG_HOME equivalent via HOME
 				os.Setenv("HOME", dir)
 				return globalPath
@@ -337,12 +337,12 @@ func TestFindConfigs(t *testing.T) {
 				runGitCommand(t, dir, "config", "user.email", "test@test.com")
 				runGitCommand(t, dir, "config", "user.name", "Test")
 				// Project config
-				os.WriteFile(filepath.Join(dir, ".wt.yaml"), []byte("tmux:\n  layout: project\n"), 0644)
+				os.WriteFile(filepath.Join(dir, ".wt.yaml"), []byte("tmux:\n  layout: project\n"), 0o644)
 				// Global config
 				globalDir := filepath.Join(dir, ".config", "wt")
-				os.MkdirAll(globalDir, 0755)
+				os.MkdirAll(globalDir, 0o755)
 				globalPath := filepath.Join(globalDir, "config.yaml")
-				os.WriteFile(globalPath, []byte("tmux:\n  layout: global\n"), 0644)
+				os.WriteFile(globalPath, []byte("tmux:\n  layout: global\n"), 0o644)
 				os.Setenv("HOME", dir)
 				return globalPath
 			},

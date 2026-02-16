@@ -76,3 +76,8 @@ func Fatal(format string, args ...interface{}) {
 	_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: "+format+"\n", args...)
 	os.Exit(1)
 }
+
+// Warn prints a warning to stderr (does not exit)
+func Warn(format string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, "Warning: "+format+"\n", args...)
+}

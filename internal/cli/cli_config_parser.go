@@ -2,10 +2,82 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/joebalancio/wt/internal/config"
 )
+
+// ConfigScope defines which config to target
+type ConfigScope int
+
+// Config scope constants define which configuration file(s) to use.
+// ScopeMerged: Read returns merged config, write defaults to local.
+// ScopeLocal: Local .wt.yaml only.
+// ScopeGlobal: Global ~/.config/wt/config.yaml only.
+const (
+	ScopeMerged ConfigScope = iota // Read: merged, Write: local
+	ScopeLocal                     // Local only
+	ScopeGlobal                    // Global only
+)
+
+// Operation defines read vs write context
+type Operation int
+
+// Operation constants define whether we're reading or writing config.
+const (
+	OpRead  Operation = iota // Read operation
+	OpWrite                  // Write operation
+)
+
+// ResolveConfigPaths returns the appropriate paths based on scope and operation.
+// For ScopeMerged with OpRead: returns both project and global paths for merging
+// For ScopeMerged with OpWrite: returns project path only (default to local)
+// For ScopeLocal: returns project path only, errors if not in git repo
+// For ScopeGlobal: returns global path only
+func ResolveConfigPaths(scope ConfigScope, op Operation) (projectPath, globalPath string, err error) {
+	// Get global path (always available)
+	home, homeErr := os.UserHomeDir()
+	if homeErr != nil {
+		home = os.Getenv("HOME")
+	}
+	globalPath = filepath.Join(home, ".config", "wt", "config.yaml")
+
+	switch scope {
+	case ScopeGlobal:
+		return "", globalPath, nil
+
+	case ScopeLocal:
+		gitRoot, gitErr := config.FindGitRoot()
+		if gitErr != nil {
+			return "", "", fmt.Errorf("not in a git repository: local config requires being in a git repository, use --global to modify global config")
+		}
+		projectPath = filepath.Join(gitRoot, ".wt.yaml")
+		return projectPath, "", nil
+
+	case ScopeMerged:
+		if op == OpWrite {
+			// Default writes to local
+			gitRoot, gitErr := config.FindGitRoot()
+			if gitErr != nil {
+				return "", "", fmt.Errorf("not in a git repository: local config requires being in a git repository, use --global to modify global config")
+			}
+			projectPath = filepath.Join(gitRoot, ".wt.yaml")
+			return projectPath, "", nil
+		}
+		// Read operation: use FindConfigs for merged behavior
+		projectPath, globalPath, err = config.FindConfigs("")
+		if err != nil {
+			// No configs found, but that's okay for reads (will use defaults)
+			return "", "", nil
+		}
+		return projectPath, globalPath, nil
+
+	default:
+		return "", "", fmt.Errorf("unknown config scope: %d", scope)
+	}
+}
 
 // GetValue retrieves a value from config using dot-notation key
 func GetValue(cfg *config.Config, key string) (interface{}, error) {
