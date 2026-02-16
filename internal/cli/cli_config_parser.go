@@ -115,8 +115,6 @@ func GetValue(cfg *config.Config, key string) (interface{}, error) {
 // getGlobalValue retrieves a global config value
 func getGlobalValue(cfg *config.Config, field string) (interface{}, error) {
 	switch field {
-	case "tmux_session_prefix":
-		return cfg.Global.TmuxSessionPrefix, nil
 	default:
 		return nil, fmt.Errorf("unknown key: global.%s", field)
 	}
@@ -215,9 +213,6 @@ func SetValue(cfg *config.Config, key, value string) error {
 // setGlobalValue sets a global config value
 func setGlobalValue(cfg *config.Config, field, value string) error {
 	switch field {
-	case "tmux_session_prefix":
-		cfg.Global.TmuxSessionPrefix = value
-		return nil
 	default:
 		return fmt.Errorf("unknown key: global.%s", field)
 	}
@@ -345,9 +340,6 @@ func UnsetValue(cfg *config.Config, key string) error {
 // unsetGlobalValue unsets a global config value to default
 func unsetGlobalValue(cfg *config.Config, field string) error {
 	switch field {
-	case "tmux_session_prefix":
-		cfg.Global.TmuxSessionPrefix = "wt-" // default
-		return nil
 	default:
 		return fmt.Errorf("unknown key: global.%s", field)
 	}
@@ -420,7 +412,6 @@ func unsetTmuxWindowNamingValue(cfg *config.Config, field string) error {
 // isSupportedKey returns true if key can be manipulated via CLI
 func isSupportedKey(key string) bool {
 	supportedKeys := map[string]bool{
-		"global.tmux_session_prefix":             true,
 		"worktree.location":                      true,
 		"worktree.dedicated_path":                true,
 		"tmux.layout":                            true,
