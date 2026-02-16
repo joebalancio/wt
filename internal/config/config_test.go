@@ -76,8 +76,8 @@ worktree:
 worktree:
   location: "per-repo"
 `,
-			projectYAML:    "",
-			wantLocation:   "per-repo",
+			projectYAML:  "",
+			wantLocation: "per-repo",
 		},
 	}
 
