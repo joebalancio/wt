@@ -198,17 +198,6 @@ hooks:
   on_worktree_remove:
     - run: "rm -rf node_modules"
       cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
-
-# Project-specific configuration
-# DEPRECATED: Use .wt.yaml in the repository root instead
-# The project_overrides field is kept for backward compatibility but is no longer used.
-# To configure project-specific hooks, create a .wt.yaml file in the repository root.
-# project_overrides:
-#   - match: "**/*rust*"                 # Matches projects with "rust" in path
-#     hooks:
-#       on_worktree_create:
-#         - run: "cargo fetch"
-#           cwd: "{worktree_path}"
 ```
 
 **Worktree Location Modes:**
@@ -318,7 +307,6 @@ wt config set hooks.on_worktree_create "echo hi"
 **Notes:**
 - `set` and `unset` commands always modify the global config (`~/.config/wt/config.yaml`)
 - For hooks, edit the config file directly (project-local `.wt.yaml` or global config)
-- `project_overrides` is deprecated; use project-local `.wt.yaml` files instead
 - `get` and `list` respect the config discovery order (flag → local → global)
 
 ---
