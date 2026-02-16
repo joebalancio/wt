@@ -45,7 +45,7 @@ func TestConfigSetDefaultBehavior(t *testing.T) {
 
 	// Create command without --global flag
 	cmd := NewConfigSetCmd()
-	cmd.SetArgs([]string{"tmux.layout", "tiled"})
+	cmd.SetArgs([]string{"worktree.location", "per-repo"})
 
 	// Capture output
 	var buf bytes.Buffer
@@ -89,7 +89,7 @@ func TestConfigSetGlobalFlagOutsideGit(t *testing.T) {
 
 	// Create command with --global flag
 	cmd := NewConfigSetCmd()
-	cmd.SetArgs([]string{"--global", "tmux.layout", "tiled"})
+	cmd.SetArgs([]string{"--global", "worktree.location", "per-repo"})
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
