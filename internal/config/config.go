@@ -15,10 +15,9 @@ import (
 
 // Config represents the main configuration structure
 type Config struct {
-	Hooks     HooksConfig      `yaml:"hooks"`
-	Worktree  WorktreeConfig   `yaml:"worktree"`
-	Spice     SpiceConfig      `yaml:"spice"`
-	Overrides []OverrideConfig `yaml:"project_overrides,omitempty"`
+	Hooks    HooksConfig    `yaml:"hooks"`
+	Worktree WorktreeConfig `yaml:"worktree"`
+	Spice    SpiceConfig    `yaml:"spice"`
 }
 
 // HooksConfig defines hook configurations
@@ -56,16 +55,6 @@ func (w *WorktreeConfig) GetDedicatedPath() string {
 		return w.DedicatedPath
 	}
 	return "~/worktrees" // default
-}
-
-// OverrideConfig allows project-specific overrides
-//
-// Deprecated: Use project-local .wt.yaml files instead.
-// This field is kept for backward compatibility but is no longer actively used.
-// Project-specific hooks should be defined in a .wt.yaml file at the repository root.
-type OverrideConfig struct {
-	Match string      `yaml:"match"`
-	Hooks HooksConfig `yaml:"hooks,omitempty"`
 }
 
 // DefaultConfig returns a configuration with sensible defaults

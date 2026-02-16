@@ -127,7 +127,7 @@ func SetValue(cfg *config.Config, key, value string) error {
 
 	// Check if key is supported for CLI manipulation
 	if !isSupportedKey(key) {
-		return fmt.Errorf("key %q not supported for CLI manipulation\n       Edit config file directly to modify hooks or project_overrides", key)
+		return fmt.Errorf("key %q not supported for CLI manipulation\n       Edit config file directly to modify hooks", key)
 	}
 
 	section := parts[0]
