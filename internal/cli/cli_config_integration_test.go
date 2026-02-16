@@ -134,7 +134,7 @@ func TestGetCommandIntegration(t *testing.T) {
 		key      string
 		expected string
 	}{
-		{"worktree.location", "dedicated"},
+		{"worktree.location", ""}, // empty means per-repo (default)
 		{"worktree.dedicated_path", "~/worktrees"},
 	}
 
@@ -191,8 +191,8 @@ func TestSetUnsetIntegration(t *testing.T) {
 		if err := UnsetValue(loadedCfg, "worktree.location"); err != nil {
 			t.Fatalf("UnsetValue error: %v", err)
 		}
-		if loadedCfg.Worktree.Location != "dedicated" {
-			t.Errorf("expected default location 'dedicated', got %q", loadedCfg.Worktree.Location)
+		if loadedCfg.Worktree.Location != "" {
+			t.Errorf("expected default location '' (per-repo), got %q", loadedCfg.Worktree.Location)
 		}
 	})
 
@@ -233,8 +233,8 @@ func TestListOutput(t *testing.T) {
 	// The actual YAML marshaling is done by gopkg.in/yaml.v3 library
 	cfg := config.DefaultConfig()
 
-	// Verify config has expected values
-	if cfg.Worktree.Location == "" {
-		t.Error("expected Worktree.Location to be set")
+	// Verify config uses per-repo by default (empty location)
+	if cfg.Worktree.IsDedicated() {
+		t.Error("default config should use per-repo worktree location")
 	}
 }

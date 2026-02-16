@@ -267,6 +267,8 @@ func TestService_GetWorktreePathForBranch(t *testing.T) {
 	}
 	mockSpice := &MockSpiceClient{}
 	cfg := config.DefaultConfig()
+	// Default is now per-repo, so set to dedicated for this test
+	cfg.Worktree.Location = "dedicated"
 
 	service, _ := NewService(mockGit, mockSpice, cfg)
 

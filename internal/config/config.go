@@ -46,7 +46,7 @@ type SpiceConfig struct {
 
 // IsDedicated returns true if using dedicated worktree location
 func (w *WorktreeConfig) IsDedicated() bool {
-	return w.Location == "" || w.Location == "dedicated"
+	return w.Location == "dedicated"
 }
 
 // GetDedicatedPath returns the dedicated path (with default fallback)
@@ -61,7 +61,7 @@ func (w *WorktreeConfig) GetDedicatedPath() string {
 func DefaultConfig() *Config {
 	return &Config{
 		Worktree: WorktreeConfig{
-			Location:      "dedicated",
+			Location:      "", // empty means per-repo (default)
 			DedicatedPath: "~/worktrees",
 		},
 		Spice: SpiceConfig{
