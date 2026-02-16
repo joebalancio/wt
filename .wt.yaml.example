@@ -7,10 +7,6 @@
 #   - Arrays (hooks): project array replaces global entirely
 #   - Undefined fields: inherit from global
 
-global:
-  # Prefix for tmux session names
-  tmux_session_prefix: "wt-"
-
 # Hooks run automatically after worktree operations
 # NOTE: These are global defaults. Override in .wt.yaml for project-specific hooks.
 hooks:
@@ -18,12 +14,6 @@ hooks:
     # Example: Install Node.js dependencies
     - run: "npm install"
       cwd: "{worktree_path}"
-      background: false
-
-    # Example: Run build in background
-    - run: "npm run build"
-      cwd: "{worktree_path}"
-      background: true
 
   on_worktree_remove:
     # Example: Clean up on remove
@@ -76,7 +66,6 @@ worktree:
 #       cwd: "{worktree_path}"
 #     - run: "cargo build"
 #       cwd: "{worktree_path}"
-#       background: true
 #
 # tmux:
 #   attach_on_create: false  # Override global setting

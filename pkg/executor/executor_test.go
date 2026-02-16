@@ -161,29 +161,6 @@ func TestExecutor_VerboseLogging_LevelZero(t *testing.T) {
 	}
 }
 
-func TestExecutor_RunParallel(t *testing.T) {
-	e := New()
-	ctx := context.Background()
-
-	hooks := []HookDefinition{
-		{Command: "echo one"},
-		{Command: "echo two"},
-		{Command: "echo three"},
-	}
-
-	results := e.RunParallel(ctx, hooks)
-
-	if len(results) != 3 {
-		t.Fatalf("expected 3 results, got %d", len(results))
-	}
-
-	for i, result := range results {
-		if !result.Success {
-			t.Fatalf("result %d expected success, got error: %v", i, result.Error)
-		}
-	}
-}
-
 func TestExecutor_GetVerboseLevel(t *testing.T) {
 	e := New()
 

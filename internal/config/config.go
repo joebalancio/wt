@@ -25,7 +25,6 @@ type Config struct {
 
 // GlobalConfig contains global settings
 type GlobalConfig struct {
-	TmuxSessionPrefix string `yaml:"tmux_session_prefix"`
 }
 
 // HooksConfig defines hook configurations
@@ -37,10 +36,8 @@ type HooksConfig struct {
 
 // Hook represents a single command to run
 type Hook struct {
-	Run        string `yaml:"run"`
-	Cwd        string `yaml:"cwd,omitempty"`
-	Background bool   `yaml:"background,omitempty"`
-	Parallel   bool   `yaml:"parallel,omitempty"`
+	Run string `yaml:"run"`
+	Cwd string `yaml:"cwd,omitempty"`
 }
 
 // TmuxConfig contains tmux-specific settings
@@ -94,9 +91,7 @@ type OverrideConfig struct {
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		Global: GlobalConfig{
-			TmuxSessionPrefix: "wt-",
-		},
+		Global: GlobalConfig{},
 		Tmux: TmuxConfig{
 			Layout:         "main-vertical",
 			WindowName:     "work",

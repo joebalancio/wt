@@ -87,11 +87,8 @@ hooks:
   # Runs after everything is complete (worktree gone)
   on_worktree_remove:
     - run: gh issue close $ISSUE_ID --comment "Merged via wt done"
-      background: true
     - run: slack-notify "Merged {branch} to main"
-      background: true
     - run: trigger-deployment {branch}
-      background: true
 ```
 
 **Hook Template Variables:**

@@ -173,7 +173,6 @@ hooks:
   on_worktree_create:
     - run: "npm install"
       cwd: "{worktree_path}"  # Supports template variable
-      background: false
 ```
 
 ### Git-Spice Configuration

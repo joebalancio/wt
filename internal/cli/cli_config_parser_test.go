@@ -24,7 +24,6 @@ func TestGetValue(t *testing.T) {
 		{"tmux attach_on_create", "tmux.attach_on_create", "true", false},
 		{"tmux layout", "tmux.layout", "main-vertical", false},
 		{"tmux window_name", "tmux.window_name", "work", false},
-		{"global tmux_session_prefix", "global.tmux_session_prefix", "wt-", false},
 		{"invalid key format", "invalid", "", true},
 		{"unsupported key", "hooks.on_worktree_create", "", true},
 		{"unknown section", "unknown.field", "", true},
@@ -69,7 +68,6 @@ func TestSetValue(t *testing.T) {
 		{"invalid bool", "tmux.attach_on_create", "maybe", true},
 		{"unsupported key", "hooks.on_worktree_create", "echo hi", true},
 		{"invalid key format", "invalid", "value", true},
-		{"global prefix", "global.tmux_session_prefix", "test-", false},
 		{"tmux layout", "tmux.layout", "tiled", false},
 		{"tmux window_name", "tmux.window_name", "editor", false},
 	}
@@ -139,16 +137,6 @@ func TestUnsetValue(t *testing.T) {
 			validate: func(cfg *config.Config) {
 				if cfg.Tmux.WindowName != "work" {
 					t.Errorf("expected default 'work', got %q", cfg.Tmux.WindowName)
-				}
-			},
-		},
-		{
-			name:      "unset global tmux_session_prefix",
-			key:       "global.tmux_session_prefix",
-			wantError: false,
-			validate: func(cfg *config.Config) {
-				if cfg.Global.TmuxSessionPrefix != "wt-" {
-					t.Errorf("expected default 'wt-', got %q", cfg.Global.TmuxSessionPrefix)
 				}
 			},
 		},

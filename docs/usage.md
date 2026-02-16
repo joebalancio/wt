@@ -194,13 +194,6 @@ hooks:
   on_worktree_create:
     - run: "npm install"
       cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
-      background: false                  # Run synchronously
-      parallel: false                    # Can run with other parallel hooks
-
-    - run: "npm run build"
-      cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
-      background: true                   # Run asynchronously
-      parallel: true                     # Can run in parallel with other parallel hooks
 
   on_worktree_remove:
     - run: "rm -rf node_modules"
@@ -230,7 +223,6 @@ hooks:
 **NOT IMPLEMENTED - Future Features:**
 
 The following configuration sections are documented but NOT implemented in the current version:
-- `global.tmux_session_prefix` - Tmux integration is planned for a future release
 - `tmux.*` section - All tmux configuration and session management is not yet available
 
 
@@ -258,7 +250,6 @@ wt config <command> [arguments]
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `global.tmux_session_prefix` | string | `wt-` | Prefix for tmux session names |
 | `worktree.location` | string | `dedicated` | Worktree location mode (`dedicated` or `per-repo`) |
 | `worktree.dedicated_path` | string | `~/worktrees` | Path for dedicated mode worktrees |
 | `tmux.layout` | string | `main-vertical` | Default tmux layout |
@@ -382,16 +373,12 @@ hooks:
   on_worktree_create:
     - run: "npm install"
       cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
-      background: true
-      parallel: true
 
     - run: "npm run build"
       cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
-      background: true
-      parallel: true
 ```
 
-Now when you run `wt add feature/new`, dependencies are installed and the project is built automatically in the background.
+Now when you run `wt add feature/new`, dependencies are installed and the project is built automatically.
 
 **Note**: The `{worktree_path}` template expansion is not yet implemented. Use absolute paths or manage working directories manually for now.
 

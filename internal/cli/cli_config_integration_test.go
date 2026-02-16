@@ -138,7 +138,6 @@ func TestGetCommandIntegration(t *testing.T) {
 		{"tmux.attach_on_create", "true"},
 		{"tmux.layout", "main-vertical"},
 		{"tmux.window_name", "work"},
-		{"global.tmux_session_prefix", "wt-"},
 	}
 
 	for _, tt := range tests {
@@ -262,8 +261,5 @@ func TestListOutput(t *testing.T) {
 	}
 	if cfg.Tmux.Layout == "" {
 		t.Error("expected Tmux.Layout to be set")
-	}
-	if cfg.Global.TmuxSessionPrefix == "" {
-		t.Error("expected Global.TmuxSessionPrefix to be set")
 	}
 }
