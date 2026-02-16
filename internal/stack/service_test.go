@@ -276,7 +276,8 @@ func TestService_GetWorktreePathForBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetWorktreePathForBranch() error = %v", err)
 	}
-	expected := cfg.Worktree.GetDedicatedPath() + "/feat/auth"
+	// Path should include repo name (project)
+	expected := cfg.Worktree.GetDedicatedPath() + "/project/feat/auth"
 	if path != expected {
 		t.Errorf("path = %v, want %v", path, expected)
 	}
@@ -314,6 +315,29 @@ func TestService_getWorktreePath_PerRepoMode_ErrorFallback(t *testing.T) {
 	// Should fallback to relative path
 	if path == "" {
 		t.Error("path should not be empty even with error")
+	}
+}
+
+func TestGetWorktreePath_Dedicated_addsRepoName(t *testing.T) {
+	mockGit := &MockGitClient{
+		repoRoot: "/home/user/projects/my-repo",
+	}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+	cfg.Worktree.Location = "dedicated"
+	cfg.Worktree.DedicatedPath = "/tmp/worktrees"
+
+	service, _ := NewService(mockGit, mockSpice, cfg)
+
+	path, err := service.GetWorktreePathForBranch(context.Background(), "feature/auth")
+	if err != nil {
+		t.Fatalf("GetWorktreePathForBranch() error = %v", err)
+	}
+
+	// Path should include repo name
+	expected := "/tmp/worktrees/my-repo/feature/auth"
+	if path != expected {
+		t.Errorf("GetWorktreePathForBranch() = %q, want %q", path, expected)
 	}
 }
 
