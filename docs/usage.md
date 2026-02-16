@@ -194,13 +194,6 @@ hooks:
   on_worktree_create:
     - run: "npm install"
       cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
-      background: false                  # Run synchronously
-      parallel: false                    # Can run with other parallel hooks
-
-    - run: "npm run build"
-      cwd: "{worktree_path}"             # Template expansion NOT YET IMPLEMENTED
-      background: true                   # Run asynchronously
-      parallel: true                     # Can run in parallel with other parallel hooks
 
   on_worktree_remove:
     - run: "rm -rf node_modules"
@@ -380,16 +373,12 @@ hooks:
   on_worktree_create:
     - run: "npm install"
       cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
-      background: true
-      parallel: true
 
     - run: "npm run build"
       cwd: "/absolute/path/to/project"  # Use absolute paths (template expansion not yet available)
-      background: true
-      parallel: true
 ```
 
-Now when you run `wt add feature/new`, dependencies are installed and the project is built automatically in the background.
+Now when you run `wt add feature/new`, dependencies are installed and the project is built automatically.
 
 **Note**: The `{worktree_path}` template expansion is not yet implemented. Use absolute paths or manage working directories manually for now.
 
