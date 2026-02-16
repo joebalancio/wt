@@ -99,7 +99,15 @@ func (s *Service) ResolvePath(ctx context.Context, branch string, explicitPath s
 			}
 			dedicatedPath = filepath.Join(home, dedicatedPath[2:])
 		}
-		return filepath.Join(dedicatedPath, branch), nil
+
+		// Get repo info for namespace
+		repoInfo, err := s.git.GetRepoInfo(ctx)
+		if err != nil {
+			return "", fmt.Errorf("getting repo info: %w", err)
+		}
+		repoName := filepath.Base(repoInfo.RootPath)
+
+		return filepath.Join(dedicatedPath, repoName, branch), nil
 	}
 
 	// per-repo mode

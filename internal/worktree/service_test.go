@@ -710,6 +710,58 @@ func TestService_RemoveEnhanced(t *testing.T) {
 	})
 }
 
+func TestResolvePath_Dedicated_addsRepoName(t *testing.T) {
+	mockGit := &mockGitClient{
+		getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+			return &domain.GitRepo{RootPath: "/home/user/projects/my-repo", DefaultBranch: "main"}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+	cfg.Worktree.Location = "dedicated"
+	cfg.Worktree.DedicatedPath = "/tmp/worktrees"
+
+	svc, err := NewService(mockGit, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := svc.ResolvePath(context.Background(), "feature/auth", "")
+	if err != nil {
+		t.Fatalf("ResolvePath() error = %v", err)
+	}
+
+	// Path should include repo name: /tmp/worktrees/my-repo/feature/auth
+	expected := "/tmp/worktrees/my-repo/feature/auth"
+	if path != expected {
+		t.Errorf("ResolvePath() = %q, want %q", path, expected)
+	}
+}
+
+func TestResolvePath_PerRepo_unchanged(t *testing.T) {
+	mockGit := &mockGitClient{
+		getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+			return &domain.GitRepo{RootPath: "/home/user/projects/my-repo", DefaultBranch: "main"}, nil
+		},
+	}
+	cfg := config.DefaultConfig() // per-repo is default
+
+	svc, err := NewService(mockGit, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := svc.ResolvePath(context.Background(), "feature/auth", "")
+	if err != nil {
+		t.Fatalf("ResolvePath() error = %v", err)
+	}
+
+	// Path should be per-repo style: <repo>/.worktrees/<branch>
+	expected := "/home/user/projects/my-repo/.worktrees/feature/auth"
+	if path != expected {
+		t.Errorf("ResolvePath() = %q, want %q", path, expected)
+	}
+}
+
 func TestService_Done(t *testing.T) {
 	t.Run("successful done workflow", func(t *testing.T) {
 		mergeCalled := false
