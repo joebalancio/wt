@@ -40,7 +40,7 @@ func TestConfigGetMergedOutsideGitWarning(t *testing.T) {
 	}
 
 	cmd := NewConfigGetCmd()
-	cmd.SetArgs([]string{"tmux.layout"})
+	cmd.SetArgs([]string{"worktree.location"})
 
 	// Capture both stdout and stderr
 	var stdout, stderr bytes.Buffer

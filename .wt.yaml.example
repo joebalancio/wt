@@ -20,24 +20,6 @@ hooks:
     - run: "rm -rf node_modules"
       cwd: "{worktree_path}"
 
-# Tmux settings
-tmux:
-  # Layout: main-vertical, main-horizontal, even-horizontal, tiled, etc.
-  layout: "main-vertical"
-
-  # Name for the initial window
-  window_name: "work"
-
-  # Automatically attach to session after creation
-  attach_on_create: true
-
-  # Window naming preferences
-  window_naming:
-    # Maximum length for window names (1-32)
-    max_length: 16
-    # Abbreviate issue IDs in window names (e.g., "nova-123" -> "n-123")
-    abbreviate_issue_id: true
-
 # Git-spice configuration for branch stacking
 spice:
   # Path to git-spice binary. Set this via 'wt init' for auto-detection.
@@ -66,9 +48,6 @@ worktree:
 #       cwd: "{worktree_path}"
 #     - run: "cargo build"
 #       cwd: "{worktree_path}"
-#
-# tmux:
-#   attach_on_create: false  # Override global setting
 #
 # worktree:
 #   location: "per-repo"  # Use .worktrees/ inside repo

@@ -21,8 +21,8 @@ func TestLoadConfigForCommand_Merged(t *testing.T) {
 hooks:
   on_worktree_create:
     - run: "cargo fetch"
-tmux:
-  attach_on_create: false
+worktree:
+  location: "per-repo"
 `
 	projectPath := filepath.Join(tempDir, ".wt.yaml")
 	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
@@ -36,9 +36,9 @@ tmux:
 hooks:
   on_worktree_create:
     - run: "npm install"
-tmux:
-  layout: "main-horizontal"
-  attach_on_create: true
+worktree:
+  location: "dedicated"
+  dedicated_path: "~/worktrees"
 `
 	globalPath := filepath.Join(globalDir, "config.yaml")
 	if err := os.WriteFile(globalPath, []byte(globalConfig), 0o644); err != nil {
@@ -55,13 +55,8 @@ tmux:
 	}
 
 	// Verify project overrides global
-	if cfg.Tmux.AttachOnCreate != false {
-		t.Errorf("AttachOnCreate = %v, want false", cfg.Tmux.AttachOnCreate)
-	}
-
-	// Verify undefined field inherits
-	if cfg.Tmux.Layout != "main-horizontal" {
-		t.Errorf("Layout = %q, want main-horizontal", cfg.Tmux.Layout)
+	if cfg.Worktree.Location != "per-repo" {
+		t.Errorf("Location = %q, want per-repo", cfg.Worktree.Location)
 	}
 
 	// Verify array replacement
@@ -82,8 +77,9 @@ func TestLoadConfigForCommand_ProjectOnly(t *testing.T) {
 
 	// Create project config only
 	projectConfig := `
-tmux:
-  layout: "even-horizontal"
+worktree:
+  location: "per-repo"
+  dedicated_path: "/custom/path"
 `
 	projectPath := filepath.Join(tempDir, ".wt.yaml")
 	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
@@ -98,13 +94,11 @@ tmux:
 	}
 
 	// Verify project value
-	if cfg.Tmux.Layout != "even-horizontal" {
-		t.Errorf("Layout = %q, want even-horizontal", cfg.Tmux.Layout)
+	if cfg.Worktree.Location != "per-repo" {
+		t.Errorf("Location = %q, want per-repo", cfg.Worktree.Location)
 	}
-
-	// Verify defaults for unset fields
-	if cfg.Tmux.WindowName != "work" {
-		t.Errorf("WindowName = %q, want work (default)", cfg.Tmux.WindowName)
+	if cfg.Worktree.DedicatedPath != "/custom/path" {
+		t.Errorf("DedicatedPath = %q, want /custom/path", cfg.Worktree.DedicatedPath)
 	}
 }
 
@@ -119,8 +113,8 @@ func TestLoadConfigForCommand_GlobalOnly(t *testing.T) {
 	globalDir := filepath.Join(tempDir, ".config", "wt")
 	os.MkdirAll(globalDir, 0o755)
 	globalConfig := `
-tmux:
-  layout: "main-horizontal"
+worktree:
+  location: "per-repo"
 `
 	globalPath := filepath.Join(globalDir, "config.yaml")
 	if err := os.WriteFile(globalPath, []byte(globalConfig), 0o644); err != nil {
@@ -135,8 +129,8 @@ tmux:
 	}
 
 	// Verify global value
-	if cfg.Tmux.Layout != "main-horizontal" {
-		t.Errorf("Layout = %q, want main-horizontal", cfg.Tmux.Layout)
+	if cfg.Worktree.Location != "per-repo" {
+		t.Errorf("Location = %q, want per-repo", cfg.Worktree.Location)
 	}
 }
 
@@ -148,10 +142,10 @@ func TestLoadConfigForCommand_NoConfig(t *testing.T) {
 	}
 
 	// Verify defaults
-	if cfg.Tmux.Layout != "main-vertical" {
-		t.Errorf("Layout = %q, want main-vertical (default)", cfg.Tmux.Layout)
+	if cfg.Worktree.Location != "dedicated" {
+		t.Errorf("Location = %q, want dedicated (default)", cfg.Worktree.Location)
 	}
-	if cfg.Tmux.AttachOnCreate != true {
-		t.Errorf("AttachOnCreate = %v, want true (default)", cfg.Tmux.AttachOnCreate)
+	if cfg.Worktree.GetDedicatedPath() != "~/worktrees" {
+		t.Errorf("GetDedicatedPath() = %q, want ~/worktrees (default)", cfg.Worktree.GetDedicatedPath())
 	}
 }
