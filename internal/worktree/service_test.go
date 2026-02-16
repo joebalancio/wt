@@ -139,7 +139,6 @@ func TestService_List(t *testing.T) {
 			t.Fatalf("NewService() error = %v", err)
 		}
 		worktrees, err := svc.List(context.Background(), nil)
-
 		if err != nil {
 			t.Fatalf("List() error = %v", err)
 		}
@@ -198,7 +197,6 @@ func TestService_List(t *testing.T) {
 		}
 		filter := &domain.WorktreeFilter{Branches: []string{"main"}}
 		worktrees, err := svc.List(context.Background(), filter)
-
 		if err != nil {
 			t.Fatalf("List() error = %v", err)
 		}

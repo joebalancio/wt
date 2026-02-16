@@ -36,7 +36,7 @@ tmux:
   attach_on_create: false
 `
 	gitRoot := filepath.Join(tempDir, "myproject")
-	os.MkdirAll(gitRoot, 0755)
+	os.MkdirAll(gitRoot, 0o755)
 
 	// Initialize a real git repository
 	cmd := exec.Command("git", "init")
@@ -46,19 +46,19 @@ tmux:
 	}
 
 	projectPath := filepath.Join(gitRoot, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create global config
 	globalDir := filepath.Join(tempDir, ".config", "wt")
-	os.MkdirAll(globalDir, 0755)
+	os.MkdirAll(globalDir, 0o755)
 	globalConfig := `
 tmux:
   layout: "main-horizontal"
 `
 	globalPath := filepath.Join(globalDir, "config.yaml")
-	if err := os.WriteFile(globalPath, []byte(globalConfig), 0644); err != nil {
+	if err := os.WriteFile(globalPath, []byte(globalConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ func TestCheckConfiguration_ProjectOnly(t *testing.T) {
 
 	// Create project config only
 	gitRoot := filepath.Join(tempDir, "myproject")
-	os.MkdirAll(gitRoot, 0755)
+	os.MkdirAll(gitRoot, 0o755)
 
 	// Initialize a real git repository
 	cmd := exec.Command("git", "init")
@@ -117,7 +117,7 @@ tmux:
   layout: "even-horizontal"
 `
 	projectPath := filepath.Join(gitRoot, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -154,19 +154,19 @@ func TestCheckConfiguration_GlobalOnly(t *testing.T) {
 
 	// Create global config only
 	globalDir := filepath.Join(tempDir, ".config", "wt")
-	os.MkdirAll(globalDir, 0755)
+	os.MkdirAll(globalDir, 0o755)
 	globalConfig := `
 tmux:
   layout: "main-horizontal"
 `
 	globalPath := filepath.Join(globalDir, "config.yaml")
-	if err := os.WriteFile(globalPath, []byte(globalConfig), 0644); err != nil {
+	if err := os.WriteFile(globalPath, []byte(globalConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a git repo without project config
 	gitRoot := filepath.Join(tempDir, "myproject")
-	os.MkdirAll(gitRoot, 0755)
+	os.MkdirAll(gitRoot, 0o755)
 
 	// Initialize a real git repository
 	cmd := exec.Command("git", "init")
@@ -211,7 +211,7 @@ func TestCheckConfiguration_NoConfig(t *testing.T) {
 
 	// Create a git repo without any configs
 	gitRoot := filepath.Join(tempDir, "myproject")
-	os.MkdirAll(gitRoot, 0755)
+	os.MkdirAll(gitRoot, 0o755)
 
 	// Initialize a real git repository
 	cmd := exec.Command("git", "init")
@@ -250,7 +250,7 @@ func TestCheckConfiguration_InvalidYAML(t *testing.T) {
 
 	// Create project config with invalid YAML
 	gitRoot := filepath.Join(tempDir, "myproject")
-	os.MkdirAll(gitRoot, 0755)
+	os.MkdirAll(gitRoot, 0o755)
 
 	// Initialize a real git repository
 	cmd := exec.Command("git", "init")
@@ -264,7 +264,7 @@ tmux:
   layout: [invalid yaml
 `
 	projectPath := filepath.Join(gitRoot, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

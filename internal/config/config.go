@@ -186,7 +186,7 @@ func (c *Config) ValidateSchema() error {
 // Save writes the configuration to a file
 func (c *Config) Save(path string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
@@ -195,7 +195,7 @@ func (c *Config) Save(path string) error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 

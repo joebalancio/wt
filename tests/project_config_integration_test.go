@@ -34,7 +34,7 @@ tmux:
   attach_on_create: false
 `
 	projectPath := filepath.Join(repoPath, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,13 +88,13 @@ func TestIntegration_ProjectConfig_GitRootDiscovery(t *testing.T) {
   layout: test-layout
 `
 	projectPath := filepath.Join(repoPath, ".wt.yaml")
-	if err := os.WriteFile(projectPath, []byte(projectConfig), 0644); err != nil {
+	if err := os.WriteFile(projectPath, []byte(projectConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create subdirectory
 	subDir := filepath.Join(repoPath, "src", "components")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
