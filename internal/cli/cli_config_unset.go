@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 
-	"github.com/joebalancio/wt/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +41,8 @@ Use --global to remove from the global config (~/.config/wt/config.yaml).`,
 				cfgPath = projectPath
 			}
 
-			// Load config
-			cfg, err := config.Load(cfgPath)
+			// Load or create config
+			cfg, err := loadOrCreateConfig(cfgPath)
 			if err != nil {
 				Fatal("loading config: %v", err)
 			}
