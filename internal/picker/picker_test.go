@@ -80,3 +80,17 @@ func TestPicker_SelectWorktree_ListError(t *testing.T) {
 		t.Error("SelectWorktree() should return error when ListWorktrees fails")
 	}
 }
+
+func TestPicker_SelectBranch_ListError(t *testing.T) {
+	mock := &mockBranchLister{
+		listAllBranchesFunc: func(_ context.Context) ([]string, error) {
+			return nil, errors.New("git error")
+		},
+	}
+	picker := NewPicker(mock)
+
+	_, err := picker.SelectBranch(context.Background())
+	if err == nil {
+		t.Error("SelectBranch() should return error when ListAllBranches fails")
+	}
+}
