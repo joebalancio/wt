@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/picker"
 	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
@@ -77,15 +78,32 @@ func runRemoveCommand(cmd *cobra.Command, path string, force domain.ForceLevel) 
 
 	resolvedPath := path
 	if resolvedPath == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			Fatal("Failed to get current directory: %v", err)
+		if picker.IsTerminal() {
+			inWorktree, _, err := gitClient.IsInWorktree(ctx)
+			if err != nil {
+				Fatal("Failed to check worktree context: %v", err)
+			}
+			if !inWorktree {
+				p := picker.NewPicker(gitClient)
+				selected, err := p.SelectWorktree(ctx)
+				if err != nil {
+					Fatal("Error: %v. Provide a path: wt remove <path>", err)
+				}
+				resolvedPath = selected
+			}
 		}
-		wt, err := svc.ResolveFromCWD(ctx, cwd)
-		if err != nil {
-			Fatal("Error: %v. Provide a path: wt remove <path>", err)
+
+		if resolvedPath == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				Fatal("Failed to get current directory: %v", err)
+			}
+			wt, err := svc.ResolveFromCWD(ctx, cwd)
+			if err != nil {
+				Fatal("Error: %v. Provide a path: wt remove <path>", err)
+			}
+			resolvedPath = wt.Path
 		}
-		resolvedPath = wt.Path
 	}
 
 	branchName := findBranchByPath(ctx, gitClient, resolvedPath)
