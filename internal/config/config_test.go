@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -430,6 +431,36 @@ func TestHook_Timeout(t *testing.T) {
 			}
 			if hook.Timeout != tt.wantTime {
 				t.Errorf("Timeout = %q, want %q", hook.Timeout, tt.wantTime)
+			}
+		})
+	}
+}
+
+func TestHook_ParseTimeout(t *testing.T) {
+	tests := []struct {
+		name         string
+		timeout      string
+		wantDuration time.Duration
+		wantErr      bool
+	}{
+		{"valid seconds", "30s", 30 * time.Second, false},
+		{"valid minutes", "2m", 2 * time.Minute, false},
+		{"valid hours", "1h", time.Hour, false},
+		{"empty uses default", "", 30 * time.Second, false},
+		{"bare number fails", "30", 0, true},
+		{"invalid format fails", "invalid", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := Hook{Timeout: tt.timeout}
+			got, err := hook.ParseTimeout()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseTimeout() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.wantDuration {
+				t.Errorf("ParseTimeout() = %v, want %v", got, tt.wantDuration)
 			}
 		})
 	}
