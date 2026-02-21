@@ -24,3 +24,22 @@ func TestNewAddCmd_TmuxIntegration(t *testing.T) {
 		t.Errorf("Expected command use 'add <branch>', got %q", cmd.Use)
 	}
 }
+
+func TestNewAddCmd_AllowsOptionalBranch(t *testing.T) {
+	cmd := NewAddCmd()
+
+	err := cmd.ValidateArgs([]string{})
+	if err != nil {
+		t.Errorf("add command should accept 0 arguments for interactive mode, got error: %v", err)
+	}
+
+	err = cmd.ValidateArgs([]string{"feature-branch"})
+	if err != nil {
+		t.Errorf("add command should accept 1 argument, got error: %v", err)
+	}
+
+	err = cmd.ValidateArgs([]string{"branch1", "branch2"})
+	if err == nil {
+		t.Error("add command should reject more than 1 argument")
+	}
+}
