@@ -82,40 +82,45 @@ func runAddCommand(cmd *cobra.Command, branch, base, path string, force bool, tr
 		Fatal("Failed to write output: %v", err)
 	}
 
-	// NEW ORDER: Create tmux window BEFORE running hooks
-	if shouldCreateTmuxWindow(NoTmux()) {
-		tmuxClient, err := tmux.NewClient()
-		if err != nil {
-			// Fall back to local hooks if tmux unavailable
-			if err := runSetupHooks(ctx, wt.Path); err != nil {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-			}
-			return
-		}
+	// Setup tmux window and run hooks
+	setupWorktreeWithTmux(ctx, cmd, wt.Branch, wt.Path)
+}
 
-		windowName := tmux.GenerateWindowName(wt.Branch)
-		if err := tmuxClient.CreateOrSelectWindow(windowName, wt.Path); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
-			// Still try to run hooks locally
-			if err := runSetupHooks(ctx, wt.Path); err != nil {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-			}
-			return
-		}
-
-		// Select the window so user sees it
-		_ = tmuxClient.SelectWindow(windowName)
-
-		// Run hooks INSIDE the new window
-		if err := runSetupHooksInWindow(ctx, wt.Path, tmuxClient, windowName); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
-		// Stay in the window regardless of hook success/failure
-	} else {
+// setupWorktreeWithTmux creates tmux window before running hooks
+func setupWorktreeWithTmux(ctx context.Context, cmd *cobra.Command, branch, worktreePath string) {
+	if !shouldCreateTmuxWindow(NoTmux()) {
 		// Not in tmux or --no-tmux: run hooks locally
-		if err := runSetupHooks(ctx, wt.Path); err != nil {
+		if err := runSetupHooks(ctx, worktreePath); err != nil {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
 		}
+		return
+	}
+
+	tmuxClient, err := tmux.NewClient()
+	if err != nil {
+		// Fall back to local hooks if tmux unavailable
+		if err := runSetupHooks(ctx, worktreePath); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+		return
+	}
+
+	windowName := tmux.GenerateWindowName(branch)
+	if err := tmuxClient.CreateOrSelectWindow(windowName, worktreePath); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+		// Still try to run hooks locally
+		if err := runSetupHooks(ctx, worktreePath); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+		return
+	}
+
+	// Select the window so user sees it
+	_ = tmuxClient.SelectWindow(windowName)
+
+	// Run hooks INSIDE the new window
+	if err := runSetupHooksInWindow(ctx, worktreePath, tmuxClient, windowName); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
 	}
 }
 
