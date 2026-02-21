@@ -32,6 +32,7 @@ type mockGitClient struct {
 	remoteBranchExistsFunc func(ctx context.Context, remote, branch string) (bool, error)
 	deleteRemoteBranchFunc func(ctx context.Context, remote, branch string) error
 	isInWorktreeFunc       func(ctx context.Context) (bool, string, error)
+	listAllBranchesFunc    func(ctx context.Context) ([]string, error)
 }
 
 func (m *mockGitClient) ListWorktrees(ctx context.Context) ([]*domain.Worktree, error) {
@@ -130,6 +131,13 @@ func (m *mockGitClient) IsInWorktree(ctx context.Context) (bool, string, error) 
 		return m.isInWorktreeFunc(ctx)
 	}
 	return false, "/repo", nil
+}
+
+func (m *mockGitClient) ListAllBranches(ctx context.Context) ([]string, error) {
+	if m.listAllBranchesFunc != nil {
+		return m.listAllBranchesFunc(ctx)
+	}
+	return []string{"main"}, nil
 }
 
 func TestService_List(t *testing.T) {
