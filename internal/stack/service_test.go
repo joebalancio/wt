@@ -407,6 +407,10 @@ func (m *MockGitClient) DeleteRemoteBranch(_ context.Context, _, _ string) error
 	return nil
 }
 
+func (m *MockGitClient) IsInWorktree(_ context.Context) (bool, string, error) {
+	return false, "/repo", nil
+}
+
 // MockSpiceClient is a mock implementation of SpiceClient for testing
 type MockSpiceClient struct {
 	createFunc func(context.Context, spice.BranchCreateSpec) (*spice.Branch, error)

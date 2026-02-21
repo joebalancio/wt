@@ -322,6 +322,52 @@ func (c *Client) DeleteRemoteBranch(ctx context.Context, remote, branch string) 
 	return nil
 }
 
+// getOutput runs a git command and returns its trimmed stdout
+func (c *Client) getOutput(ctx context.Context, args ...string) (string, error) {
+	var stdout bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+// IsInWorktree checks if the current directory is inside a git worktree.
+// Returns true if in a worktree, false if in main repo.
+// Also returns the main repository root path.
+func (c *Client) IsInWorktree(ctx context.Context) (bool, string, error) {
+	// Get current toplevel (worktree root or main repo root)
+	toplevel, err := c.getOutput(ctx, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return false, "", fmt.Errorf("getting toplevel: %w", err)
+	}
+
+	// Get common git dir (always points to main repo's .git)
+	gitCommonDir, err := c.getOutput(ctx, "rev-parse", "--git-common-dir")
+	if err != nil {
+		return false, "", fmt.Errorf("getting git-common-dir: %w", err)
+	}
+
+	// Convert gitCommonDir to absolute path if it's relative
+	if !filepath.IsAbs(gitCommonDir) {
+		// gitCommonDir is relative to toplevel
+		gitCommonDir = filepath.Join(toplevel, gitCommonDir)
+	}
+
+	// Main repo root is parent of .git directory
+	mainRepoRoot := filepath.Dir(gitCommonDir)
+
+	// Clean paths for comparison
+	toplevel = filepath.Clean(toplevel)
+	mainRepoRoot = filepath.Clean(mainRepoRoot)
+
+	// If toplevel differs from main repo root, we're in a worktree
+	inWorktree := toplevel != mainRepoRoot
+	return inWorktree, mainRepoRoot, nil
+}
+
 func parseWorktreeOutput(output string) ([]*domain.Worktree, error) {
 	var worktrees []*domain.Worktree
 	currentIndex := -1

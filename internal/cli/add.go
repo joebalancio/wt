@@ -51,6 +51,33 @@ func runAddCommand(cmd *cobra.Command, branch, base, path string, force bool, tr
 		Fatal("Failed to create git client: %v", err)
 	}
 
+	// Check if we're inside a worktree - this is not allowed
+	inWorktree, mainRepoRoot, err := gitClient.IsInWorktree(ctx)
+	if err != nil {
+		Fatal("Failed to check worktree context: %v", err)
+	}
+
+	if inWorktree {
+		// Get current toplevel for the error message
+		repoInfo, err := gitClient.GetRepoInfo(ctx)
+		currentPath := "unknown"
+		if err == nil {
+			currentPath = repoInfo.RootPath
+		}
+
+		Fatal(`cannot add worktree from inside another worktree
+
+Current location: %s
+Main repository:  %s
+
+Run this command from the main repository instead:
+  cd %s && wt add %s`,
+			currentPath,
+			mainRepoRoot,
+			mainRepoRoot,
+			branch)
+	}
+
 	cfg, err := loadConfigForCommand()
 	if err != nil {
 		Fatal("Failed to load config: %v", err)
