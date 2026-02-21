@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,8 +30,28 @@ type HooksConfig struct {
 
 // Hook represents a single command to run
 type Hook struct {
-	Run string `yaml:"run"`
-	Cwd string `yaml:"cwd,omitempty"`
+	Run     string `yaml:"run"`
+	Cwd     string `yaml:"cwd,omitempty"`
+	Timeout string `yaml:"timeout,omitempty"` // e.g., "30s", "2m", "1h"
+}
+
+// DefaultHookTimeout is the default timeout for hook execution
+const DefaultHookTimeout = 30 * time.Second
+
+// ParseTimeout parses the timeout string and returns the duration.
+// Returns DefaultHookTimeout if timeout is empty.
+// Returns error for invalid formats (bare numbers, malformed strings).
+func (h *Hook) ParseTimeout() (time.Duration, error) {
+	if h.Timeout == "" {
+		return DefaultHookTimeout, nil
+	}
+
+	// time.ParseDuration requires units, so bare numbers will fail
+	d, err := time.ParseDuration(h.Timeout)
+	if err != nil {
+		return 0, fmt.Errorf("invalid timeout %q: %w (hint: use units like 30s, 2m, 1h)", h.Timeout, err)
+	}
+	return d, nil
 }
 
 // WorktreeConfig contains worktree-specific settings

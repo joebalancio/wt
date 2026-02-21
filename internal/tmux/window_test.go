@@ -195,3 +195,47 @@ func TestClient_CreateOrSelectWindow_ExistingWindow(t *testing.T) {
 		t.Error("CreateOrSelectWindow() should not have removed existing window")
 	}
 }
+
+func TestClient_RunInWindow(t *testing.T) {
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
+	}
+
+	client, err := NewClient()
+	if err != nil {
+		t.Skipf("skipping test: tmux not available: %v", err)
+	}
+
+	// Create a test window first
+	testWindow := "test-run-in-window"
+	_ = client.KillWindow(testWindow) // cleanup any existing
+
+	err = client.CreateNewWindow(testWindow, "/tmp")
+	if err != nil {
+		t.Fatalf("CreateNewWindow() error = %v", err)
+	}
+	defer func() { _ = client.KillWindow(testWindow) }()
+
+	// Run a simple command in the window
+	err = client.RunInWindow(testWindow, "echo 'hello from run-in-window'")
+	if err != nil {
+		t.Errorf("RunInWindow() error = %v", err)
+	}
+}
+
+func TestClient_RunInWindow_NonexistentWindow(t *testing.T) {
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
+	}
+
+	client, err := NewClient()
+	if err != nil {
+		t.Skipf("skipping test: tmux not available: %v", err)
+	}
+
+	// Try to run in a window that doesn't exist
+	// Note: tmux run-shell doesn't necessarily error on invalid targets
+	// This test verifies the method doesn't panic and handles the call
+	_ = client.RunInWindow("nonexistent-window-xyz123", "echo test")
+	// We don't assert on error since tmux behavior varies
+}

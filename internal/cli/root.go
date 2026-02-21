@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/pkg/executor"
 	"github.com/spf13/cobra"
 )
@@ -79,6 +80,17 @@ func runSetupHooks(ctx context.Context, worktreePath string) error {
 	}
 
 	runner := executor.NewHookRunner(worktreePath)
+	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
+}
+
+// runSetupHooksInWindow executes post-create hooks in a tmux window
+func runSetupHooksInWindow(ctx context.Context, worktreePath string, tmuxClient *tmux.Client, windowName string) error {
+	cfg, err := loadConfigForCommand()
+	if err != nil {
+		return err
+	}
+
+	runner := executor.NewHookRunner(worktreePath, executor.WithTmux(tmuxClient, windowName))
 	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
 }
 

@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadMerged(t *testing.T) {
@@ -385,6 +388,79 @@ func TestFindConfigs(t *testing.T) {
 			}
 			if !tt.wantGlobal && globalPath != "" {
 				t.Errorf("FindConfigs() expected no global path, got %q", globalPath)
+			}
+		})
+	}
+}
+
+func TestHook_Timeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		wantRun  string
+		wantCwd  string
+		wantTime string
+	}{
+		{
+			name:     "hook with all fields",
+			yaml:     `run: "npm install"` + "\n" + `cwd: "/app"` + "\n" + `timeout: "2m"`,
+			wantRun:  "npm install",
+			wantCwd:  "/app",
+			wantTime: "2m",
+		},
+		{
+			name:     "hook without timeout uses empty default",
+			yaml:     `run: "echo done"`,
+			wantRun:  "echo done",
+			wantCwd:  "",
+			wantTime: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var hook Hook
+			if err := yaml.Unmarshal([]byte(tt.yaml), &hook); err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+			if hook.Run != tt.wantRun {
+				t.Errorf("Run = %q, want %q", hook.Run, tt.wantRun)
+			}
+			if hook.Cwd != tt.wantCwd {
+				t.Errorf("Cwd = %q, want %q", hook.Cwd, tt.wantCwd)
+			}
+			if hook.Timeout != tt.wantTime {
+				t.Errorf("Timeout = %q, want %q", hook.Timeout, tt.wantTime)
+			}
+		})
+	}
+}
+
+func TestHook_ParseTimeout(t *testing.T) {
+	tests := []struct {
+		name         string
+		timeout      string
+		wantDuration time.Duration
+		wantErr      bool
+	}{
+		{"valid seconds", "30s", 30 * time.Second, false},
+		{"valid minutes", "2m", 2 * time.Minute, false},
+		{"valid hours", "1h", time.Hour, false},
+		{"empty uses default", "", 30 * time.Second, false},
+		{"bare number fails", "30", 0, true},
+		{"invalid format fails", "invalid", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := Hook{Timeout: tt.timeout}
+			got, err := hook.ParseTimeout()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseTimeout() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.wantDuration {
+				t.Errorf("ParseTimeout() = %v, want %v", got, tt.wantDuration)
 			}
 		})
 	}

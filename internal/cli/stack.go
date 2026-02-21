@@ -8,6 +8,7 @@ import (
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/spice"
 	"github.com/joebalancio/wt/internal/stack"
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -128,13 +129,42 @@ func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *
 		Fatal("Failed to write output: %v", err)
 	}
 
-	// Run setup hooks
-	if err := runSetupHooks(ctx, worktree.Path); err != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-	}
+	// NEW ORDER: Create tmux window BEFORE running hooks
+	if shouldCreateTmuxWindow(NoTmux()) {
+		tmuxClient, err := tmux.NewClient()
+		if err != nil {
+			// Fall back to local hooks
+			if err := runSetupHooks(ctx, worktree.Path); err != nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+			}
+			return
+		}
 
-	// Create tmux window if in tmux and not disabled
-	createStackTmuxWindow(ctx, cmd, stackService, branchName, worktree.Path)
+		// Get stack level for window naming
+		stackLevel := getStackLevel(ctx, stackService, branchName)
+		windowName := tmux.GenerateStackWindowName(branchName, stackLevel)
+
+		if err := tmuxClient.CreateOrSelectWindow(windowName, worktree.Path); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+			if err := runSetupHooks(ctx, worktree.Path); err != nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+			}
+			return
+		}
+
+		// Select the window
+		_ = tmuxClient.SelectWindow(windowName)
+
+		// Run hooks INSIDE the new window
+		if err := runSetupHooksInWindow(ctx, worktree.Path, tmuxClient, windowName); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+	} else {
+		// Not in tmux or --no-tmux: run hooks locally
+		if err := runSetupHooks(ctx, worktree.Path); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+	}
 }
 
 // NewStackListCmd creates the stack list subcommand
