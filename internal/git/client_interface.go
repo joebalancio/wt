@@ -26,4 +26,8 @@ type GitClient interface {
 	IsBranchMerged(ctx context.Context, branch string) (bool, error)
 	RemoteBranchExists(ctx context.Context, remote, branch string) (bool, error)
 	DeleteRemoteBranch(ctx context.Context, remote, branch string) error
+	// IsInWorktree checks if the current directory is inside a git worktree.
+	// Returns true if in a worktree, false if in main repo.
+	// Also returns the main repository root path.
+	IsInWorktree(ctx context.Context) (inWorktree bool, mainRepoRoot string, err error)
 }
