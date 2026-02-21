@@ -113,23 +113,40 @@ func (h *HookRunner) RunHooks(ctx context.Context, hooks []config.Hook) error {
 
 // RunHook executes a single hook
 func (h *HookRunner) RunHook(ctx context.Context, hook config.Hook) error {
-	// Expand {worktree_path} template
+	// Expand templates
 	cwd := hook.Cwd
 	cwd = h.substituteTemplates(cwd)
 	if cwd == "" {
 		cwd = h.workingDir
 	}
 
-	// Parse command
 	runCommand := h.substituteTemplates(hook.Run)
-	parts := strings.Fields(runCommand)
-	if len(parts) == 0 {
+	if runCommand == "" {
 		return fmt.Errorf("empty hook command")
 	}
 
-	// Add timeout
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	// Parse timeout
+	timeout, err := hook.ParseTimeout()
+	if err != nil {
+		return fmt.Errorf("parsing timeout: %w", err)
+	}
+
+	// Execute in tmux window or locally
+	if h.isTmuxMode() {
+		return h.runHookInTmux(hook, runCommand, cwd, timeout)
+	}
+	return h.runHookLocally(ctx, hook, runCommand, cwd, timeout)
+}
+
+// runHookLocally executes hook in current terminal
+func (h *HookRunner) runHookLocally(ctx context.Context, hook config.Hook, command, cwd string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return fmt.Errorf("empty hook command")
+	}
 
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	cmd.Dir = cwd
@@ -139,6 +156,21 @@ func (h *HookRunner) RunHook(ctx context.Context, hook config.Hook) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("running %q: %w", hook.Run, err)
 	}
+	return nil
+}
 
+// runHookInTmux executes hook in tmux window
+func (h *HookRunner) runHookInTmux(hook config.Hook, command, cwd string, timeout time.Duration) error {
+	// Build the command with cd prefix and timeout wrapper
+	timeoutBin := detectTimeoutCommand()
+	timedCmd := buildTimedCommand(timeoutBin, timeout, command)
+
+	// Build full command: cd <cwd> && <timedCmd>
+	fullCmd := fmt.Sprintf("cd %s && %s", cwd, timedCmd)
+
+	// Run in tmux window
+	if err := h.tmuxClient.RunInWindow(h.windowName, fullCmd); err != nil {
+		return fmt.Errorf("running %q in tmux: %w", hook.Run, err)
+	}
 	return nil
 }

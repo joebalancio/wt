@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -131,5 +132,37 @@ func TestHookRunner_IsTmuxMode(t *testing.T) {
 	runner = NewHookRunner("/tmp", WithTmux(client, "window"))
 	if !runner.isTmuxMode() {
 		t.Error("isTmuxMode() should be true with real tmux client")
+	}
+}
+
+func TestHookRunner_RunHook_TmuxMode(t *testing.T) {
+	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
+		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
+	}
+
+	// Create real tmux client for integration test
+	client, err := tmux.NewClient()
+	if err != nil {
+		t.Skipf("tmux not available: %v", err)
+	}
+
+	// Create test window
+	testWindow := "test-hook-runner"
+	_ = client.KillWindow(testWindow)
+	if err := client.CreateNewWindow(testWindow, "/tmp"); err != nil {
+		t.Fatalf("CreateNewWindow() error = %v", err)
+	}
+	defer func() { _ = client.KillWindow(testWindow) }()
+
+	runner := NewHookRunner("/tmp", WithTmux(client, testWindow))
+
+	hook := config.Hook{
+		Run:     "echo 'hook executed'",
+		Timeout: "5s",
+	}
+
+	err = runner.RunHook(context.Background(), hook)
+	if err != nil {
+		t.Errorf("RunHook() in tmux mode error = %v", err)
 	}
 }
