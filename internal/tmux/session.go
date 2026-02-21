@@ -454,14 +454,10 @@ func IsInTmux() bool {
 	return os.Getenv("TMUX") != ""
 }
 
-// RunInWindow runs a command in the specified window and blocks until completion.
-// Output appears in the window's pane. Returns any error from the command.
-// Uses `tmux run-shell -t <windowName> "<command>"` internally.
+// RunInWindow runs a command in the specified window using send-keys.
+// Output appears in the window's pane in real-time. The command runs
+// interactively in the pane, so there's no view-mode issue that occurs
+// with run-shell. Note: this does not block waiting for completion.
 func (c *Client) RunInWindow(windowName, command string) error {
-	args := []string{"run-shell", "-t", windowName, command}
-	cmd := exec.Command(c.tmuxPath, args...)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("running command in window %q: %w", windowName, err)
-	}
-	return nil
+	return c.SendKeys(windowName, command, true)
 }
