@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadMerged(t *testing.T) {
@@ -385,6 +387,49 @@ func TestFindConfigs(t *testing.T) {
 			}
 			if !tt.wantGlobal && globalPath != "" {
 				t.Errorf("FindConfigs() expected no global path, got %q", globalPath)
+			}
+		})
+	}
+}
+
+func TestHook_Timeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		wantRun  string
+		wantCwd  string
+		wantTime string
+	}{
+		{
+			name:     "hook with all fields",
+			yaml:     `run: "npm install"` + "\n" + `cwd: "/app"` + "\n" + `timeout: "2m"`,
+			wantRun:  "npm install",
+			wantCwd:  "/app",
+			wantTime: "2m",
+		},
+		{
+			name:     "hook without timeout uses empty default",
+			yaml:     `run: "echo done"`,
+			wantRun:  "echo done",
+			wantCwd:  "",
+			wantTime: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var hook Hook
+			if err := yaml.Unmarshal([]byte(tt.yaml), &hook); err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+			if hook.Run != tt.wantRun {
+				t.Errorf("Run = %q, want %q", hook.Run, tt.wantRun)
+			}
+			if hook.Cwd != tt.wantCwd {
+				t.Errorf("Cwd = %q, want %q", hook.Cwd, tt.wantCwd)
+			}
+			if hook.Timeout != tt.wantTime {
+				t.Errorf("Timeout = %q, want %q", hook.Timeout, tt.wantTime)
 			}
 		})
 	}

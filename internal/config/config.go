@@ -29,8 +29,9 @@ type HooksConfig struct {
 
 // Hook represents a single command to run
 type Hook struct {
-	Run string `yaml:"run"`
-	Cwd string `yaml:"cwd,omitempty"`
+	Run     string `yaml:"run"`
+	Cwd     string `yaml:"cwd,omitempty"`
+	Timeout string `yaml:"timeout,omitempty"` // e.g., "30s", "2m", "1h"
 }
 
 // WorktreeConfig contains worktree-specific settings
