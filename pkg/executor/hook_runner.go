@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/tmux"
 )
 
 var (
@@ -42,23 +43,52 @@ func buildTimedCommand(timeoutBin string, d time.Duration, command string) strin
 type HookRunner struct {
 	workingDir   string
 	templateVars map[string]string
+	tmuxClient   *tmux.Client // nil = run locally
+	windowName   string       // used if tmuxClient is set
+}
+
+// HookRunnerOption configures a HookRunner
+type HookRunnerOption func(*HookRunner)
+
+// WithTmux sets tmux execution mode
+func WithTmux(client *tmux.Client, windowName string) HookRunnerOption {
+	return func(hr *HookRunner) {
+		hr.tmuxClient = client
+		hr.windowName = windowName
+	}
+}
+
+// WithTemplateVars sets additional template variables
+func WithTemplateVars(vars map[string]string) HookRunnerOption {
+	return func(hr *HookRunner) {
+		for k, v := range vars {
+			hr.templateVars[k] = v
+		}
+	}
 }
 
 // NewHookRunner creates a new hook runner
-func NewHookRunner(workingDir string, templateVars ...map[string]string) *HookRunner {
+// Optional tmuxClient and windowName for running hooks in tmux window
+func NewHookRunner(workingDir string, opts ...HookRunnerOption) *HookRunner {
 	hr := &HookRunner{
 		workingDir:   workingDir,
 		templateVars: make(map[string]string),
 	}
+
 	// Set default template variables
 	hr.templateVars["worktree_path"] = workingDir
-	// Override with provided template variables
-	if len(templateVars) > 0 && templateVars[0] != nil {
-		for k, v := range templateVars[0] {
-			hr.templateVars[k] = v
-		}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(hr)
 	}
+
 	return hr
+}
+
+// isTmuxMode returns true if hooks should run in tmux window
+func (h *HookRunner) isTmuxMode() bool {
+	return h.tmuxClient != nil
 }
 
 // substituteTemplates replaces template variables in a string

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/tmux"
 )
 
 func TestNewHookRunner(t *testing.T) {
@@ -77,5 +78,58 @@ func TestBuildTimedCommand(t *testing.T) {
 				t.Errorf("buildTimedCommand() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNewHookRunner_WithTmux(t *testing.T) {
+	// Create a hook runner with tmux options
+	runner := NewHookRunner("/tmp", WithTmux(nil, "test-window"))
+	if runner == nil {
+		t.Fatal("NewHookRunner() returned nil")
+	}
+	if runner.workingDir != "/tmp" {
+		t.Errorf("workingDir = %v, want /tmp", runner.workingDir)
+	}
+	if runner.windowName != "test-window" {
+		t.Errorf("windowName = %v, want test-window", runner.windowName)
+	}
+}
+
+func TestNewHookRunner_WithTemplateVars(t *testing.T) {
+	vars := map[string]string{"custom_var": "custom_value"}
+	runner := NewHookRunner("/tmp", WithTemplateVars(vars))
+	if runner == nil {
+		t.Fatal("NewHookRunner() returned nil")
+	}
+	if runner.templateVars["custom_var"] != "custom_value" {
+		t.Errorf("templateVars[custom_var] = %v, want custom_value", runner.templateVars["custom_var"])
+	}
+	// Should also have default worktree_path
+	if runner.templateVars["worktree_path"] != "/tmp" {
+		t.Errorf("templateVars[worktree_path] = %v, want /tmp", runner.templateVars["worktree_path"])
+	}
+}
+
+func TestHookRunner_IsTmuxMode(t *testing.T) {
+	// Without tmux
+	runner := NewHookRunner("/tmp")
+	if runner.isTmuxMode() {
+		t.Error("isTmuxMode() should be false without tmux client")
+	}
+
+	// With nil tmux client, still not in tmux mode
+	runner = NewHookRunner("/tmp", WithTmux(nil, "window"))
+	if runner.isTmuxMode() {
+		t.Error("isTmuxMode() should be false with nil tmux client")
+	}
+
+	// With real tmux client
+	client, err := tmux.NewClient()
+	if err != nil {
+		t.Skipf("tmux not available: %v", err)
+	}
+	runner = NewHookRunner("/tmp", WithTmux(client, "window"))
+	if !runner.isTmuxMode() {
+		t.Error("isTmuxMode() should be true with real tmux client")
 	}
 }
