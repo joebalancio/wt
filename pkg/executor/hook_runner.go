@@ -6,10 +6,37 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/joebalancio/wt/internal/config"
 )
+
+var (
+	timeoutCmdOnce sync.Once
+	timeoutCmd     string
+)
+
+// detectTimeoutCommand checks for available timeout command
+// Returns "timeout", "gtimeout" (macOS coreutils), or "" if not found
+func detectTimeoutCommand() string {
+	timeoutCmdOnce.Do(func() {
+		if _, err := exec.LookPath("timeout"); err == nil {
+			timeoutCmd = "timeout"
+		} else if _, err := exec.LookPath("gtimeout"); err == nil {
+			timeoutCmd = "gtimeout"
+		}
+	})
+	return timeoutCmd
+}
+
+// buildTimedCommand wraps a command with timeout if available
+func buildTimedCommand(timeoutBin string, d time.Duration, command string) string {
+	if timeoutBin == "" {
+		return command
+	}
+	return fmt.Sprintf("%s %ds %s", timeoutBin, int(d.Seconds()), command)
+}
 
 // HookRunner executes post-create hooks
 type HookRunner struct {
