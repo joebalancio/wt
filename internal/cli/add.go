@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/picker"
 	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
@@ -28,9 +29,13 @@ func NewAddCmd() *cobra.Command {
 
 If the branch does not exist, it will be created from the base branch (default: current HEAD).
 If the branch already exists, a worktree will be added for that existing branch.`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			runAddCommand(cmd, args[0], base, path, force, track, noCheckout)
+			branch := ""
+			if len(args) > 0 {
+				branch = args[0]
+			}
+			runAddCommand(cmd, branch, base, path, force, track, noCheckout)
 		},
 	}
 
@@ -76,6 +81,21 @@ Run this command from the main repository instead:
 			mainRepoRoot,
 			mainRepoRoot,
 			branch)
+	}
+
+	if branch == "" {
+		if !picker.IsTerminal() {
+			Fatal("branch argument required when not in interactive terminal")
+		}
+		p := picker.NewPicker(gitClient)
+		result, err := p.SelectBranch(ctx)
+		if err != nil {
+			Fatal("Branch selection failed: %v", err)
+		}
+		branch = result.Branch
+		if result.IsNew && base == "" {
+			base = result.BaseBranch
+		}
 	}
 
 	cfg, err := loadConfigForCommand()
