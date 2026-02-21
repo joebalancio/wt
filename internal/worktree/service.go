@@ -396,7 +396,7 @@ func (s *Service) Done(ctx context.Context, worktreePath, branch string, force b
 			"branch":        branch,
 			"worktree_path": worktreePath,
 		}
-		runner := executor.NewHookRunner(worktreePath, templateVars)
+		runner := executor.NewHookRunner(worktreePath, executor.WithTemplateVars(templateVars))
 		if err := runner.RunHooks(ctx, s.cfg.Hooks.OnWorktreeDone); err != nil {
 			// Log hook failures as warnings but don't block cleanup
 			fmt.Fprintf(os.Stderr, "Warning: done hooks failed: %v\n", err)
@@ -420,7 +420,7 @@ func (s *Service) Done(ctx context.Context, worktreePath, branch string, force b
 			"worktree_path": worktreePath,
 		}
 		// Note: worktree is gone, so use empty working dir
-		runner := executor.NewHookRunner("", templateVars)
+		runner := executor.NewHookRunner("", executor.WithTemplateVars(templateVars))
 		if err := runner.RunHooks(ctx, s.cfg.Hooks.OnWorktreeRemove); err != nil {
 			// Log hook failures as warnings but don't fail
 			fmt.Fprintf(os.Stderr, "Warning: remove hooks failed: %v\n", err)
