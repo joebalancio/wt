@@ -28,7 +28,7 @@ func (m *mockBranchLister) ListAllBranches(ctx context.Context) ([]string, error
 	return []string{"main"}, nil
 }
 
-func TestIsTerminal(t *testing.T) {
+func TestIsTerminal(_ *testing.T) {
 	_ = IsTerminal()
 }
 

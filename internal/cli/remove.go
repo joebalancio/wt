@@ -76,34 +76,9 @@ func runRemoveCommand(cmd *cobra.Command, path string, force domain.ForceLevel) 
 		Fatal("Failed to create service: %v", err)
 	}
 
-	resolvedPath := path
-	if resolvedPath == "" {
-		if picker.IsTerminal() {
-			inWorktree, _, err := gitClient.IsInWorktree(ctx)
-			if err != nil {
-				Fatal("Failed to check worktree context: %v", err)
-			}
-			if !inWorktree {
-				p := picker.NewPicker(gitClient)
-				selected, err := p.SelectWorktree(ctx)
-				if err != nil {
-					Fatal("Error: %v. Provide a path: wt remove <path>", err)
-				}
-				resolvedPath = selected
-			}
-		}
-
-		if resolvedPath == "" {
-			cwd, err := os.Getwd()
-			if err != nil {
-				Fatal("Failed to get current directory: %v", err)
-			}
-			wt, err := svc.ResolveFromCWD(ctx, cwd)
-			if err != nil {
-				Fatal("Error: %v. Provide a path: wt remove <path>", err)
-			}
-			resolvedPath = wt.Path
-		}
+	resolvedPath, err := resolveRemovePath(ctx, path, gitClient, svc)
+	if err != nil {
+		Fatal("Error: %v. Provide a path: wt remove <path>", err)
 	}
 
 	branchName := findBranchByPath(ctx, gitClient, resolvedPath)
@@ -124,6 +99,37 @@ func runRemoveCommand(cmd *cobra.Command, path string, force domain.ForceLevel) 
 	if branchName != "" {
 		closeRemoveTmuxWindowForBranch(branchName)
 	}
+}
+
+func resolveRemovePath(ctx context.Context, path string, gitClient *git.Client, svc *worktree.Service) (string, error) {
+	if path != "" {
+		return path, nil
+	}
+
+	if picker.IsTerminal() {
+		inWorktree, _, err := gitClient.IsInWorktree(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to check worktree context: %w", err)
+		}
+		if !inWorktree {
+			p := picker.NewPicker(gitClient)
+			selected, err := p.SelectWorktree(ctx)
+			if err != nil {
+				return "", err
+			}
+			return selected, nil
+		}
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+	wt, err := svc.ResolveFromCWD(ctx, cwd)
+	if err != nil {
+		return "", err
+	}
+	return wt.Path, nil
 }
 
 // closeRemoveTmuxWindowForBranch closes the tmux window for the given branch.
