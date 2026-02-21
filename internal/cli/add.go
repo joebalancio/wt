@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/joebalancio/wt/internal/git"
+	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/joebalancio/wt/pkg/domain"
 	"github.com/spf13/cobra"
@@ -108,13 +109,46 @@ Run this command from the main repository instead:
 		Fatal("Failed to write output: %v", err)
 	}
 
-	// Run setup hooks
-	if err := runSetupHooks(ctx, wt.Path); err != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+	// Setup tmux window and run hooks
+	setupWorktreeWithTmux(ctx, cmd, wt.Branch, wt.Path)
+}
+
+// setupWorktreeWithTmux creates tmux window before running hooks
+func setupWorktreeWithTmux(ctx context.Context, cmd *cobra.Command, branch, worktreePath string) {
+	if !shouldCreateTmuxWindow(NoTmux()) {
+		// Not in tmux or --no-tmux: run hooks locally
+		if err := runSetupHooks(ctx, worktreePath); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+		return
 	}
 
-	// Create tmux window if in tmux and not disabled
-	createTmuxWindowForWorktree(cmd, wt.Branch, wt.Path)
+	tmuxClient, err := tmux.NewClient()
+	if err != nil {
+		// Fall back to local hooks if tmux unavailable
+		if err := runSetupHooks(ctx, worktreePath); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+		return
+	}
+
+	windowName := tmux.GenerateWindowName(branch)
+	if err := tmuxClient.CreateOrSelectWindow(windowName, worktreePath); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+		// Still try to run hooks locally
+		if err := runSetupHooks(ctx, worktreePath); err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+		}
+		return
+	}
+
+	// Select the window so user sees it
+	_ = tmuxClient.SelectWindow(windowName)
+
+	// Run hooks INSIDE the new window
+	if err := runSetupHooksInWindow(ctx, worktreePath, tmuxClient, windowName); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+	}
 }
 
 func init() {

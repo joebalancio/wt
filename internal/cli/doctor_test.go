@@ -288,3 +288,9 @@ tmux:
 		t.Error("Expected 'Config is invalid' in output")
 	}
 }
+
+func TestCheckTimeoutCommand(t *testing.T) {
+	path, found := checkTimeoutCommand()
+	// Just verify it doesn't panic
+	t.Logf("checkTimeoutCommand() = %q, found = %v", path, found)
+}

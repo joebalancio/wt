@@ -139,6 +139,14 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 	}
 	_, _ = fmt.Fprintf(out, "✓ git worktree supported\n")
 
+	// Check timeout command (for hook timeouts in tmux)
+	if path, found := checkTimeoutCommand(); found {
+		_, _ = fmt.Fprintf(out, "✓ timeout command: %s\n", path)
+	} else {
+		_, _ = fmt.Fprintln(out, "⚠ timeout/gtimeout not found — hook timeouts won't be enforced in tmux windows")
+		_, _ = fmt.Fprintln(out, "  Install coreutils: brew install coreutils (macOS)")
+	}
+
 	// Check git-spice
 	cfg, err := loadConfigForCommand()
 	if err != nil {
@@ -162,6 +170,17 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 
 	_, _ = fmt.Fprintf(out, "✓ git-spice installed: %s\n", version)
 	return true, true
+}
+
+// checkTimeoutCommand checks for timeout/gtimeout availability
+func checkTimeoutCommand() (path string, found bool) {
+	if path, err := exec.LookPath("timeout"); err == nil {
+		return path, true
+	}
+	if path, err := exec.LookPath("gtimeout"); err == nil {
+		return path, true
+	}
+	return "", false
 }
 
 func checkConfiguration(out io.Writer) bool {
