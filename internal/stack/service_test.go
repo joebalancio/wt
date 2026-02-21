@@ -411,6 +411,10 @@ func (m *MockGitClient) IsInWorktree(_ context.Context) (bool, string, error) {
 	return false, "/repo", nil
 }
 
+func (m *MockGitClient) ListAllBranches(_ context.Context) ([]string, error) {
+	return []string{"main"}, nil
+}
+
 // MockSpiceClient is a mock implementation of SpiceClient for testing
 type MockSpiceClient struct {
 	createFunc func(context.Context, spice.BranchCreateSpec) (*spice.Branch, error)

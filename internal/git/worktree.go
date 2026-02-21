@@ -368,6 +368,29 @@ func (c *Client) IsInWorktree(ctx context.Context) (bool, string, error) {
 	return inWorktree, mainRepoRoot, nil
 }
 
+// ListAllBranches returns all local and remote branches, deduplicated.
+func (c *Client) ListAllBranches(ctx context.Context) ([]string, error) {
+	var stdout bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, "branch", "--format=%(refname:short)")
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("listing local branches: %w", err)
+	}
+
+	seen := make(map[string]bool)
+	var branches []string
+	for _, branch := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if branch == "" || seen[branch] {
+			continue
+		}
+		seen[branch] = true
+		branches = append(branches, branch)
+	}
+
+	return branches, nil
+}
+
 func parseWorktreeOutput(output string) ([]*domain.Worktree, error) {
 	var worktrees []*domain.Worktree
 	currentIndex := -1
