@@ -234,8 +234,9 @@ func TestClient_RunInWindow_NonexistentWindow(t *testing.T) {
 	}
 
 	// Try to run in a window that doesn't exist
-	// Note: tmux run-shell doesn't necessarily error on invalid targets
-	// This test verifies the method doesn't panic and handles the call
-	_ = client.RunInWindow("nonexistent-window-xyz123", "echo test")
-	// We don't assert on error since tmux behavior varies
+	// send-keys will error on invalid targets
+	err = client.RunInWindow("nonexistent-window-xyz123", "echo test")
+	if err == nil {
+		t.Error("RunInWindow() should return error for nonexistent window")
+	}
 }
