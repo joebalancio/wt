@@ -30,4 +30,13 @@ type GitClient interface {
 	// Returns true if in a worktree, false if in main repo.
 	// Also returns the main repository root path.
 	IsInWorktree(ctx context.Context) (inWorktree bool, mainRepoRoot string, err error)
+	// ListAllBranches returns all local and remote branches, deduplicated.
+	ListAllBranches(ctx context.Context) ([]string, error)
+}
+
+// BranchLister provides read-only access to worktree and branch listing.
+// This is a subset of GitClient for use by the picker.
+type BranchLister interface {
+	ListWorktrees(ctx context.Context) ([]*domain.Worktree, error)
+	ListAllBranches(ctx context.Context) ([]string, error)
 }

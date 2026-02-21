@@ -14,3 +14,17 @@ func TestNewRemoveCmd_TmuxIntegration(t *testing.T) {
 		t.Errorf("Expected command use 'remove [path]', got %q", cmd.Use)
 	}
 }
+
+func TestNewRemoveCmd_AllowsOptionalPath(t *testing.T) {
+	cmd := NewRemoveCmd()
+
+	err := cmd.ValidateArgs([]string{})
+	if err != nil {
+		t.Errorf("remove command should accept 0 arguments for interactive mode, got error: %v", err)
+	}
+
+	err = cmd.ValidateArgs([]string{"/path/to/worktree"})
+	if err != nil {
+		t.Errorf("remove command should accept 1 argument, got error: %v", err)
+	}
+}
