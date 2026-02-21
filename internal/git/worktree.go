@@ -53,9 +53,17 @@ func (c *Client) AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec
 		args = append(args, "--force")
 	}
 
-	// Always create a new branch with -b flag
-	// Syntax: git worktree add [-b <new-branch>] <path> [<start-point>]
-	args = append(args, "-b", spec.Branch)
+	// Check if branch already exists to determine correct syntax:
+	// - Existing branch: git worktree add <path> <branch>
+	// - New branch: git worktree add -b <branch> <path> [<start-point>]
+	branchExists, err := c.BranchExists(ctx, spec.Branch)
+	if err != nil {
+		return nil, fmt.Errorf("checking if branch exists: %w", err)
+	}
+
+	if !branchExists {
+		args = append(args, "-b", spec.Branch)
+	}
 
 	if spec.Path == "" {
 		return nil, fmt.Errorf("spec.Path is required")
@@ -63,16 +71,22 @@ func (c *Client) AddWorktree(ctx context.Context, spec domain.WorktreeCreateSpec
 	args = append(args, spec.Path)
 	path := spec.Path
 
-	// Optional: start point (commit/branch to create from)
-	if spec.Base != "" {
-		args = append(args, spec.Base)
+	if branchExists {
+		// Existing branch: pass branch name as commit-ish
+		args = append(args, spec.Branch)
+	} else {
+		// New branch: optionally pass base as start point
+		if spec.Base != "" {
+			args = append(args, spec.Base)
+		}
 	}
 
 	if !spec.Checkout {
 		args = append(args, "--no-checkout")
 	}
 
-	if spec.Track != nil {
+	// --track only applies when creating a new branch
+	if !branchExists && spec.Track != nil {
 		args = append(args, "--track", *spec.Track)
 	}
 
