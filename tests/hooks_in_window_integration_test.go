@@ -84,10 +84,10 @@ func TestHooksWithTimeoutInTmux(t *testing.T) {
 func TestHookTimeoutField(t *testing.T) {
 	// Unit test for the Timeout field parsing
 	tests := []struct {
-		name         string
-		timeout      string
-		wantDefault  bool
-		wantErr      bool
+		name        string
+		timeout     string
+		wantDefault bool
+		wantErr     bool
 	}{
 		{"empty uses default", "", true, false},
 		{"valid seconds", "30s", false, false},
