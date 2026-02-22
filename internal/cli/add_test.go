@@ -43,3 +43,14 @@ func TestNewAddCmd_AllowsOptionalBranch(t *testing.T) {
 		t.Error("add command should reject more than 1 argument")
 	}
 }
+
+func TestNewAddCmd_HasRunFlag(t *testing.T) {
+	cmd := NewAddCmd()
+	flag := cmd.Flags().Lookup("run")
+	if flag == nil {
+		t.Fatal("expected --run flag to be defined")
+	}
+	if flag.DefValue != "" {
+		t.Errorf("expected --run default to be empty, got %q", flag.DefValue)
+	}
+}
