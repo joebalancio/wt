@@ -23,27 +23,32 @@ type SpiceClient interface {
 
 // Service provides stack-related operations
 type Service struct {
-	git   git.GitClient
-	spice SpiceClient
-	cfg   *config.Config
+	git         git.GitClient
+	spice       SpiceClient
+	cfg         *config.Config
+	worktreeSvc WorktreeClient
 }
 
 // NewService creates a new stack service
-func NewService(gitClient git.GitClient, spiceClient SpiceClient, cfg *config.Config) (*Service, error) {
+func NewService(gitClient git.GitClient, spiceClient SpiceClient, cfg *config.Config, worktreeClient WorktreeClient) (*Service, error) {
 	if gitClient == nil {
 		return nil, fmt.Errorf("gitClient cannot be nil")
 	}
 	if spiceClient == nil {
 		return nil, fmt.Errorf("spiceClient cannot be nil")
 	}
+	if worktreeClient == nil {
+		return nil, fmt.Errorf("worktreeClient cannot be nil")
+	}
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
 
 	return &Service{
-		git:   gitClient,
-		spice: spiceClient,
-		cfg:   cfg,
+		git:         gitClient,
+		spice:       spiceClient,
+		cfg:         cfg,
+		worktreeSvc: worktreeClient,
 	}, nil
 }
 
@@ -70,8 +75,11 @@ func (s *Service) BuildStackBranchName(currentBranch, suffixName string) string 
 
 // BranchSpec defines parameters for creating a stack branch
 type BranchSpec struct {
-	Name string // Optional named suffix (e.g., "api" for feat/auth-api-xxxx)
-	Base string // Optional base branch (defaults to current)
+	Name       string // Optional named suffix (e.g., "api" for feat/auth-api-xxxx)
+	Base       string // Optional base branch (defaults to current)
+	Path       string // Custom worktree path (optional)
+	Track      string // Remote branch to track (optional)
+	NoCheckout bool   // Skip checkout (optional)
 }
 
 // CreateStackBranch creates a new stacked branch using git-spice
@@ -115,15 +123,21 @@ func (s *Service) CreateStackBranch(ctx context.Context, spec BranchSpec) (*doma
 
 // CreateWorktree creates a worktree for a stack branch
 func (s *Service) CreateWorktree(ctx context.Context, branch string) (*domain.Worktree, error) {
-	worktreePath := s.getWorktreePath(ctx, branch)
+	return s.CreateWorktreeWithSpec(ctx, branch, BranchSpec{})
+}
 
-	spec := domain.WorktreeCreateSpec{
+// CreateWorktreeWithSpec creates a worktree for a stack branch with full spec support.
+func (s *Service) CreateWorktreeWithSpec(ctx context.Context, branch string, spec BranchSpec) (*domain.Worktree, error) {
+	worktreeSpec := domain.WorktreeCreateSpec{
 		Branch:   branch,
-		Path:     worktreePath,
-		Checkout: true,
+		Path:     spec.Path,
+		Checkout: !spec.NoCheckout,
+	}
+	if spec.Track != "" {
+		worktreeSpec.Track = &spec.Track
 	}
 
-	return s.git.AddWorktree(ctx, spec)
+	return s.worktreeSvc.Add(ctx, worktreeSpec)
 }
 
 // GetStack returns the current stack of branches with worktree paths
