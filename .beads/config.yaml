@@ -60,3 +60,6 @@ sync-branch: "beads-sync"
 # - linear.api-key
 # - github.org
 # - github.repo
+backend: dolt
+sync:
+  mode: dolt-native
