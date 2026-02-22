@@ -15,3 +15,14 @@ func TestNewStackCmd_TmuxIntegration(t *testing.T) {
 		t.Errorf("Expected command use 'stack [name]', got %q", cmd.Use)
 	}
 }
+
+func TestNewStackCmd_HasRunFlag(t *testing.T) {
+	cmd := NewStackCmd()
+	flag := cmd.Flags().Lookup("run")
+	if flag == nil {
+		t.Fatal("expected --run flag to be defined")
+	}
+	if flag.DefValue != "" {
+		t.Errorf("expected --run default to be empty, got %q", flag.DefValue)
+	}
+}

@@ -20,6 +20,7 @@ func NewAddCmd() *cobra.Command {
 		force      bool
 		track      string
 		noCheckout bool
+		run        string
 	)
 
 	cmd := &cobra.Command{
@@ -28,14 +29,21 @@ func NewAddCmd() *cobra.Command {
 		Long: `Add a new worktree for the specified branch.
 
 If the branch does not exist, it will be created from the base branch (default: current HEAD).
-If the branch already exists, a worktree will be added for that existing branch.`,
+If the branch already exists, a worktree will be added for that existing branch.
+
+Use --run to execute a command after hooks complete:
+  wt add feat/auth --run "claude"
+
+Template variables:
+  {worktree_path} - Path to the new worktree
+  {branch} - Branch name`,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			branch := ""
 			if len(args) > 0 {
 				branch = args[0]
 			}
-			runAddCommand(cmd, branch, base, path, force, track, noCheckout)
+			runAddCommand(cmd, branch, base, path, force, track, noCheckout, run)
 		},
 	}
 
@@ -44,11 +52,12 @@ If the branch already exists, a worktree will be added for that existing branch.
 	cmd.Flags().BoolVar(&force, "force", false, "force creation even if path exists")
 	cmd.Flags().StringVar(&track, "track", "", "remote branch to track")
 	cmd.Flags().BoolVar(&noCheckout, "no-checkout", false, "don't checkout the branch")
+	cmd.Flags().StringVar(&run, "run", "", "command to run after hooks (e.g., 'claude')")
 
 	return cmd
 }
 
-func runAddCommand(cmd *cobra.Command, branch, base, path string, force bool, track string, noCheckout bool) {
+func runAddCommand(cmd *cobra.Command, branch, base, path string, force bool, track string, noCheckout bool, run string) {
 	ctx := context.Background()
 
 	gitClient, err := git.NewClient()
@@ -130,35 +139,29 @@ Run this command from the main repository instead:
 	}
 
 	// Setup tmux window and run hooks
-	setupWorktreeWithTmux(ctx, cmd, wt.Branch, wt.Path)
+	setupWorktreeWithTmux(ctx, cmd, wt.Branch, wt.Path, run)
 }
 
 // setupWorktreeWithTmux creates tmux window before running hooks
-func setupWorktreeWithTmux(ctx context.Context, cmd *cobra.Command, branch, worktreePath string) {
+func setupWorktreeWithTmux(ctx context.Context, cmd *cobra.Command, branch, worktreePath, runCmd string) {
 	if !shouldCreateTmuxWindow(NoTmux()) {
-		// Not in tmux or --no-tmux: run hooks locally
-		if err := runSetupHooks(ctx, worktreePath); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
+		runSetupHooksWithWarning(ctx, cmd, worktreePath)
+		runCommandLocallyOrFatal(branch, worktreePath, runCmd)
 		return
 	}
 
 	tmuxClient, err := tmux.NewClient()
 	if err != nil {
-		// Fall back to local hooks if tmux unavailable
-		if err := runSetupHooks(ctx, worktreePath); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
+		runSetupHooksWithWarning(ctx, cmd, worktreePath)
+		runCommandLocallyOrFatal(branch, worktreePath, runCmd)
 		return
 	}
 
 	windowName := tmux.GenerateWindowName(branch)
+	windowExisted, _ := tmuxClient.WindowExists(windowName)
 	if err := tmuxClient.CreateOrSelectWindow(windowName, worktreePath); err != nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
-		// Still try to run hooks locally
-		if err := runSetupHooks(ctx, worktreePath); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
+		runSetupHooksWithWarning(ctx, cmd, worktreePath)
 		return
 	}
 
@@ -168,6 +171,17 @@ func setupWorktreeWithTmux(ctx context.Context, cmd *cobra.Command, branch, work
 	// Run hooks INSIDE the new window
 	if err := runSetupHooksInWindow(ctx, worktreePath, tmuxClient, windowName); err != nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+	}
+	if runCmd != "" {
+		_ = runCommandAfterHooks(RunCommandOpts{
+			Command:       runCmd,
+			WorktreePath:  worktreePath,
+			Branch:        branch,
+			WindowName:    windowName,
+			TmuxClient:    tmuxClient,
+			WindowExisted: windowExisted,
+			InTmux:        true,
+		})
 	}
 }
 

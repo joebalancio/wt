@@ -18,6 +18,7 @@ func NewStackCmd() *cobra.Command {
 		stackBase  string
 		stackForce bool
 		noSetup    bool
+		run        string
 	)
 
 	cmd := &cobra.Command{
@@ -30,21 +31,27 @@ If a name is provided, appends it with a 4-char suffix.
 
 Examples:
   wt stack              # Creates: currentBranch-xY7k
-  wt stack api          # Creates: currentBranch-api-k9P2`,
+  wt stack api          # Creates: currentBranch-api-k9P2
+  wt stack api --run "claude"  # Run command after setup
+
+Template variables for --run:
+  {worktree_path} - Path to the new worktree
+  {branch} - Branch name`,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			runStackCommand(cmd, args, stackBase, stackForce, noSetup)
+			runStackCommand(cmd, args, stackBase, stackForce, noSetup, run)
 		},
 	}
 
 	cmd.Flags().StringVar(&stackBase, "base", "", "base branch for stack (default: current)")
 	cmd.Flags().BoolVar(&stackForce, "force", false, "allow stacking on main/master")
 	cmd.Flags().BoolVar(&noSetup, "no-setup", false, "skip setup hooks and worktree creation")
+	cmd.Flags().StringVar(&run, "run", "", "command to run after hooks (e.g., 'claude')")
 
 	return cmd
 }
 
-func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackForce bool, noSetup bool) {
+func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackForce bool, noSetup bool, run string) {
 	ctx := context.Background()
 	out := cmd.OutOrStdout()
 
@@ -83,7 +90,7 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 
 	// Create worktree
 	if !noSetup {
-		createStackWorktree(ctx, cmd, stackService, stackBranch.Name)
+		createStackWorktree(ctx, cmd, stackService, stackBranch.Name, run)
 	}
 }
 
@@ -118,7 +125,7 @@ func initStackService() *stack.Service {
 }
 
 // createStackWorktree creates a worktree for the stack branch and sets up hooks and tmux
-func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName string) {
+func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName, runCmd string) {
 	out := cmd.OutOrStdout()
 
 	worktree, err := stackService.CreateWorktree(ctx, branchName)
@@ -130,40 +137,47 @@ func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *
 	}
 
 	// NEW ORDER: Create tmux window BEFORE running hooks
-	if shouldCreateTmuxWindow(NoTmux()) {
-		tmuxClient, err := tmux.NewClient()
-		if err != nil {
-			// Fall back to local hooks
-			if err := runSetupHooks(ctx, worktree.Path); err != nil {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-			}
-			return
-		}
+	if !shouldCreateTmuxWindow(NoTmux()) {
+		runSetupHooksWithWarning(ctx, cmd, worktree.Path)
+		runCommandLocallyOrFatal(branchName, worktree.Path, runCmd)
+		return
+	}
 
-		// Get stack level for window naming
-		stackLevel := getStackLevel(ctx, stackService, branchName)
-		windowName := tmux.GenerateStackWindowName(branchName, stackLevel)
+	tmuxClient, err := tmux.NewClient()
+	if err != nil {
+		runSetupHooksWithWarning(ctx, cmd, worktree.Path)
+		runCommandLocallyOrFatal(branchName, worktree.Path, runCmd)
+		return
+	}
 
-		if err := tmuxClient.CreateOrSelectWindow(windowName, worktree.Path); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
-			if err := runSetupHooks(ctx, worktree.Path); err != nil {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-			}
-			return
-		}
+	// Get stack level for window naming
+	stackLevel := getStackLevel(ctx, stackService, branchName)
+	windowName := tmux.GenerateStackWindowName(branchName, stackLevel)
+	windowExisted, _ := tmuxClient.WindowExists(windowName)
 
-		// Select the window
-		_ = tmuxClient.SelectWindow(windowName)
+	if err := tmuxClient.CreateOrSelectWindow(windowName, worktree.Path); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to create tmux window: %v\n", err)
+		runSetupHooksWithWarning(ctx, cmd, worktree.Path)
+		return
+	}
 
-		// Run hooks INSIDE the new window
-		if err := runSetupHooksInWindow(ctx, worktree.Path, tmuxClient, windowName); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
-	} else {
-		// Not in tmux or --no-tmux: run hooks locally
-		if err := runSetupHooks(ctx, worktree.Path); err != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-		}
+	// Select the window
+	_ = tmuxClient.SelectWindow(windowName)
+
+	// Run hooks INSIDE the new window
+	if err := runSetupHooksInWindow(ctx, worktree.Path, tmuxClient, windowName); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
+	}
+	if runCmd != "" {
+		_ = runCommandAfterHooks(RunCommandOpts{
+			Command:       runCmd,
+			WorktreePath:  worktree.Path,
+			Branch:        branchName,
+			WindowName:    windowName,
+			TmuxClient:    tmuxClient,
+			WindowExisted: windowExisted,
+			InTmux:        true,
+		})
 	}
 }
 

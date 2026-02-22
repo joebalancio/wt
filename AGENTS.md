@@ -68,6 +68,26 @@ make clean                 # Remove build artifacts
 make install               # Install to GOPATH/bin
 ```
 
+### wt add --run flag
+
+Run a command after worktree creation and hooks complete.
+
+```bash
+# Start Claude Code in new worktree
+wt add feat/auth --run "claude"
+
+# Use templates
+wt add feat/api --run "echo {worktree_path} {branch}"
+
+# Works with --no-tmux (execs into command)
+wt add feat/ui --no-tmux --run "claude"
+```
+
+**Behavior:**
+- In tmux: command is sent to the target window (fire-and-forget)
+- Outside tmux: wt replaces itself with the command
+- If the window already exists: `--run` is skipped with a message
+
 
 ### wt config command
 
