@@ -166,6 +166,49 @@ hooks:
 - `tests/done_conflict_integration_test.go` - Merge conflict tests
 - `tests/done_dirty_integration_test.go` - Dirty worktree tests
 
+### wt stack command
+
+Create and manage stacked branches using git-spice.
+
+```bash
+# Create stacked branch with auto-suffix
+wt stack              # Creates: currentBranch-xY7k
+
+# Create stacked branch with named suffix
+wt stack api          # Creates: currentBranch-api-k9P2
+
+# With custom path
+wt stack api --path /custom/path
+
+# Track remote branch
+wt stack api --track origin/feat-auth
+
+# Skip checkout
+wt stack api --no-checkout
+
+# Allow stacking on main/master
+wt stack api --force
+
+# Skip setup hooks and worktree creation
+wt stack api --no-setup
+
+# List stack hierarchy
+wt stack list
+```
+
+**Flags:**
+- `--base` - Base branch for stack (default: current)
+- `--force` - Allow stacking on main/master
+- `--no-setup` - Skip setup hooks and worktree creation
+- `--path` - Custom path for worktree
+- `--track` - Remote branch to track
+- `--no-checkout` - Don't checkout the branch
+
+**Safety Features:**
+- Worktree nesting check (cannot stack from inside a worktree)
+- Main/master protection (use `--force` to override)
+- Path collision detection via `worktree.Service`
+
 
 ## Architecture Overview
 
