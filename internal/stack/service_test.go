@@ -15,7 +15,7 @@ func TestNewService(t *testing.T) {
 	mockSpice := &MockSpiceClient{}
 	cfg := config.DefaultConfig()
 
-	service, err := NewService(mockGit, mockSpice, cfg)
+	service, err := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -28,7 +28,7 @@ func TestNewService_NilGitClient(t *testing.T) {
 	mockSpice := &MockSpiceClient{}
 	cfg := config.DefaultConfig()
 
-	_, err := NewService(nil, mockSpice, cfg)
+	_, err := NewService(nil, mockSpice, cfg, newMockWorktreeClient())
 	if err == nil {
 		t.Error("NewService() with nil gitClient should return error")
 	}
@@ -38,9 +38,20 @@ func TestNewService_NilSpiceClient(t *testing.T) {
 	mockGit := &MockGitClient{}
 	cfg := config.DefaultConfig()
 
-	_, err := NewService(mockGit, nil, cfg)
+	_, err := NewService(mockGit, nil, cfg, newMockWorktreeClient())
 	if err == nil {
 		t.Error("NewService() with nil spiceClient should return error")
+	}
+}
+
+func TestNewService_NilWorktreeClient(t *testing.T) {
+	mockGit := &MockGitClient{}
+	mockSpice := &MockSpiceClient{}
+	cfg := config.DefaultConfig()
+
+	_, err := NewService(mockGit, mockSpice, cfg, nil)
+	if err == nil {
+		t.Error("NewService() with nil worktreeClient should return error")
 	}
 }
 
@@ -48,7 +59,7 @@ func TestNewService_NilConfigUsesDefault(t *testing.T) {
 	mockGit := &MockGitClient{}
 	mockSpice := &MockSpiceClient{}
 
-	service, err := NewService(mockGit, mockSpice, nil)
+	service, err := NewService(mockGit, mockSpice, nil, newMockWorktreeClient())
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -62,7 +73,7 @@ func TestService_GenerateBranchSuffix(t *testing.T) {
 	mockSpice := &MockSpiceClient{}
 	cfg := config.DefaultConfig()
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	suffix1 := service.GenerateBranchSuffix()
 	suffix2 := service.GenerateBranchSuffix()
@@ -75,12 +86,30 @@ func TestService_GenerateBranchSuffix(t *testing.T) {
 	}
 }
 
+func TestBranchSpec_NewFields(t *testing.T) {
+	spec := BranchSpec{
+		Path:       "/custom/path",
+		Track:      "origin/api",
+		NoCheckout: true,
+	}
+
+	if spec.Path != "/custom/path" {
+		t.Errorf("Path = %v, want /custom/path", spec.Path)
+	}
+	if spec.Track != "origin/api" {
+		t.Errorf("Track = %v, want origin/api", spec.Track)
+	}
+	if !spec.NoCheckout {
+		t.Error("NoCheckout should be true")
+	}
+}
+
 func TestService_BuildStackBranchName(t *testing.T) {
 	mockGit := &MockGitClient{}
 	mockSpice := &MockSpiceClient{}
 	cfg := config.DefaultConfig()
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	tests := []struct {
 		name       string
@@ -129,7 +158,7 @@ func TestService_CreateStackBranch(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 
-	service, err := NewService(mockGit, mockSpice, cfg)
+	service, err := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -162,7 +191,7 @@ func TestService_CreateStackBranch_NamedSuffix(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	spec := BranchSpec{Name: "api"}
 	branch, err := service.CreateStackBranch(context.Background(), spec)
@@ -188,7 +217,7 @@ func TestService_CreateStackBranch_WithBase(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	// Test with explicit base
 	spec := BranchSpec{Name: "fix", Base: "main"}
@@ -215,7 +244,7 @@ func TestService_CreateStackBranch_BaseDefaultsToCurrent(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	// Test without base - should default to current branch
 	spec := BranchSpec{Name: "fix"}
@@ -225,6 +254,112 @@ func TestService_CreateStackBranch_BaseDefaultsToCurrent(t *testing.T) {
 	}
 	if capturedBase != "feat/auth" {
 		t.Errorf("Base = %v, want feat/auth", capturedBase)
+	}
+}
+
+func TestService_CreateWorktree_UsesWorktreeService(t *testing.T) {
+	var receivedSpec domain.WorktreeCreateSpec
+	mockGit := &MockGitClient{currentBranch: "feat/auth", repoRoot: "/repo"}
+	mockSpice := &MockSpiceClient{}
+	mockWorktree := &mockWorktreeClient{
+		addFunc: func(_ context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+			receivedSpec = spec
+			return &domain.Worktree{Path: "/resolved/path", Branch: spec.Branch}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+
+	service, _ := NewService(mockGit, mockSpice, cfg, mockWorktree)
+
+	result, err := service.CreateWorktree(context.Background(), "feat/auth-api-xxxx")
+	if err != nil {
+		t.Fatalf("CreateWorktree() error = %v", err)
+	}
+	if result.Path != "/resolved/path" {
+		t.Errorf("Path = %v, want /resolved/path", result.Path)
+	}
+	if receivedSpec.Branch != "feat/auth-api-xxxx" {
+		t.Errorf("Received branch = %v, want feat/auth-api-xxxx", receivedSpec.Branch)
+	}
+}
+
+func TestService_CreateWorktree_PassesFlags(t *testing.T) {
+	tests := []struct {
+		name         string
+		spec         BranchSpec
+		wantPath     string
+		wantTrack    *string
+		wantCheckout bool
+	}{
+		{
+			name:         "default values",
+			spec:         BranchSpec{Name: "api"},
+			wantPath:     "",
+			wantCheckout: true,
+		},
+		{
+			name:         "custom path",
+			spec:         BranchSpec{Name: "api", Path: "/custom"},
+			wantPath:     "/custom",
+			wantCheckout: true,
+		},
+		{
+			name:         "no checkout",
+			spec:         BranchSpec{Name: "api", NoCheckout: true},
+			wantPath:     "",
+			wantCheckout: false,
+		},
+		{
+			name:         "with track",
+			spec:         BranchSpec{Name: "api", Track: "origin/api"},
+			wantPath:     "",
+			wantCheckout: true,
+			wantTrack:    strPtr("origin/api"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var receivedSpec domain.WorktreeCreateSpec
+			mockGit := &MockGitClient{currentBranch: "feat/auth", repoRoot: "/repo"}
+			mockSpice := &MockSpiceClient{
+				createFunc: func(_ context.Context, _ spice.BranchCreateSpec) (*spice.Branch, error) {
+					return &spice.Branch{Name: "feat/auth-api-xxxx"}, nil
+				},
+			}
+			mockWorktree := &mockWorktreeClient{
+				addFunc: func(_ context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+					receivedSpec = spec
+					return &domain.Worktree{Path: "/path", Branch: spec.Branch}, nil
+				},
+			}
+			cfg := config.DefaultConfig()
+
+			service, _ := NewService(mockGit, mockSpice, cfg, mockWorktree)
+
+			_, err := service.CreateStackBranch(context.Background(), tt.spec)
+			if err != nil {
+				t.Fatalf("CreateStackBranch() error = %v", err)
+			}
+
+			_, err = service.CreateWorktreeWithSpec(context.Background(), "feat/auth-api-xxxx", tt.spec)
+			if err != nil {
+				t.Fatalf("CreateWorktreeWithSpec() error = %v", err)
+			}
+
+			if receivedSpec.Path != tt.wantPath {
+				t.Errorf("Path = %v, want %v", receivedSpec.Path, tt.wantPath)
+			}
+			if receivedSpec.Checkout != tt.wantCheckout {
+				t.Errorf("Checkout = %v, want %v", receivedSpec.Checkout, tt.wantCheckout)
+			}
+			if tt.wantTrack != nil && receivedSpec.Track == nil {
+				t.Error("Track should not be nil")
+			}
+			if tt.wantTrack != nil && *receivedSpec.Track != *tt.wantTrack {
+				t.Errorf("Track = %v, want %v", *receivedSpec.Track, *tt.wantTrack)
+			}
+		})
 	}
 }
 
@@ -244,7 +379,7 @@ func TestService_GetStack(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	stack, err := service.GetStack(context.Background())
 	if err != nil {
@@ -270,7 +405,7 @@ func TestService_GetWorktreePathForBranch(t *testing.T) {
 	// Default is now per-repo, so set to dedicated for this test
 	cfg.Worktree.Location = "dedicated"
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	path, err := service.GetWorktreePathForBranch(context.Background(), "feat/auth")
 	if err != nil {
@@ -291,7 +426,7 @@ func TestService_getWorktreePath_PerRepoMode(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Worktree.Location = "per-repo"
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	path := service.getWorktreePath(context.Background(), "feat/auth")
 	expected := "/home/user/project/.worktrees/feat/auth"
@@ -309,7 +444,7 @@ func TestService_getWorktreePath_PerRepoMode_ErrorFallback(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Worktree.Location = "per-repo"
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	path := service.getWorktreePath(context.Background(), "feat/auth")
 	// Should fallback to relative path
@@ -327,7 +462,7 @@ func TestGetWorktreePath_Dedicated_addsRepoName(t *testing.T) {
 	cfg.Worktree.Location = "dedicated"
 	cfg.Worktree.DedicatedPath = "/tmp/worktrees"
 
-	service, _ := NewService(mockGit, mockSpice, cfg)
+	service, _ := NewService(mockGit, mockSpice, cfg, newMockWorktreeClient())
 
 	path, err := service.GetWorktreePathForBranch(context.Background(), "feature/auth")
 	if err != nil {
@@ -343,6 +478,14 @@ func TestGetWorktreePath_Dedicated_addsRepoName(t *testing.T) {
 
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func newMockWorktreeClient() *mockWorktreeClient {
+	return &mockWorktreeClient{}
 }
 
 // MockGitClient is a mock implementation of git.GitClient for testing

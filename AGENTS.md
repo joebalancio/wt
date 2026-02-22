@@ -88,6 +88,39 @@ wt add feat/ui --no-tmux --run "claude"
 - Outside tmux: wt replaces itself with the command
 - If the window already exists: `--run` is skipped with a message
 
+### wt stack command
+
+Create stacked branches with optional flags.
+
+```bash
+# Create stack with auto-suffix
+wt stack
+
+# Create stack with named suffix
+wt stack api
+
+# Custom worktree path
+wt stack api --path /custom/path
+
+# Track remote branch
+wt stack api --track origin/api
+
+# Skip checkout
+wt stack api --no-checkout
+
+# Run command after setup
+wt stack api --run "claude"
+```
+
+**Flags:**
+- `--base` - Base branch for stack (default: current)
+- `--force` - Allow stacking on main/master
+- `--no-setup` - Skip setup hooks and worktree creation
+- `--run` - Command to run after hooks
+- `--path` - Custom worktree path
+- `--track` - Remote branch to track
+- `--no-checkout` - Don't checkout the branch
+
 
 ### wt config command
 
