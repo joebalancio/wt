@@ -22,8 +22,9 @@ var ErrPathCollision = errors.New("path collision detected")
 
 // Service provides worktree management operations
 type Service struct {
-	git git.GitClient
-	cfg *config.Config
+	git      git.GitClient
+	cfg      *config.Config
+	ghClient *git.GhClient
 }
 
 // NewService creates a new worktree service
@@ -34,9 +35,16 @@ func NewService(gitClient git.GitClient, cfg *config.Config) (*Service, error) {
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
+
+	var ghClient *git.GhClient
+	if gc, err := git.NewGhClient(); err == nil {
+		ghClient = gc
+	}
+
 	return &Service{
-		git: gitClient,
-		cfg: cfg,
+		git:      gitClient,
+		cfg:      cfg,
+		ghClient: ghClient,
 	}, nil
 }
 
@@ -294,9 +302,21 @@ func (s *Service) validateRemoveSafety(ctx context.Context, target *domain.Workt
 		return errors.New("worktree has uncommitted changes. Use --force to remove anyway")
 	}
 
-	merged, err := s.git.IsBranchMerged(ctx, target.Branch)
-	if err != nil {
-		return fmt.Errorf("checking branch merge status: %w", err)
+	type mergeDetector interface {
+		IsBranchMergedWithDetection(ctx context.Context, branch string, ghClient *git.GhClient) (bool, error)
+	}
+
+	var (
+		merged   bool
+		mergeErr error
+	)
+	if detector, ok := s.git.(mergeDetector); ok {
+		merged, mergeErr = detector.IsBranchMergedWithDetection(ctx, target.Branch, s.ghClient)
+	} else {
+		merged, mergeErr = s.git.IsBranchMerged(ctx, target.Branch)
+	}
+	if mergeErr != nil {
+		return fmt.Errorf("checking branch merge status: %w", mergeErr)
 	}
 	if !merged && force == domain.ForceNone {
 		return fmt.Errorf("branch %q is not merged. Use --force to delete anyway", target.Branch)

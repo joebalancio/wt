@@ -43,6 +43,9 @@ and verifies that required dependencies (git, git-spice) are installed.`,
 				Fatal("git-spice check failed: %v", err)
 			}
 
+			// Check gh CLI (optional)
+			_ = checkGhCLIForInit(ctx, out)
+
 			// Create config file
 			if _, err := fmt.Fprintln(out, "\nChecking configuration..."); err != nil {
 				Fatal("Failed to write output: %v", err)
@@ -89,6 +92,34 @@ func checkGitSpice(_ context.Context, out io.Writer) error {
 	}
 
 	_, _ = fmt.Fprintf(out, "✓ git-spice installed: %s\n", path)
+	return nil
+}
+
+func checkGhCLIForInit(ctx context.Context, out io.Writer) error {
+	ghClient, err := git.NewGhClient()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, "⚠ gh CLI not found (optional)")
+		_, _ = fmt.Fprintln(out, "  gh CLI enables squash-merge detection for 'wt remove'.")
+		_, _ = fmt.Fprintln(out, "  Install: brew install gh && gh auth login")
+		_, _ = fmt.Fprintln(out)
+		return err
+	}
+
+	if !ghClient.IsAvailable() {
+		_, _ = fmt.Fprintln(out, "⚠ gh CLI unavailable (optional)")
+		_, _ = fmt.Fprintln(out)
+		return fmt.Errorf("gh client unavailable")
+	}
+
+	cmd := exec.CommandContext(ctx, "gh", "auth", "status")
+	if err := cmd.Run(); err != nil {
+		_, _ = fmt.Fprintln(out, "⚠ gh CLI installed but not authenticated")
+		_, _ = fmt.Fprintln(out, "  Run: gh auth login")
+		_, _ = fmt.Fprintln(out)
+		return err
+	}
+
+	_, _ = fmt.Fprintln(out, "✓ gh CLI installed and authenticated")
 	return nil
 }
 

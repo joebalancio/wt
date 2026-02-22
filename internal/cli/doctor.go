@@ -151,6 +151,7 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 	cfg, err := loadConfigForCommand()
 	if err != nil {
 		_, _ = fmt.Fprintf(out, "! Failed to load config: %v\n", err)
+		_ = checkGhCLI(ctx, out)
 		return true, false
 	}
 
@@ -159,17 +160,47 @@ func checkDependencies(ctx context.Context, out io.Writer) (gitOK bool, gitSpice
 		_, _ = fmt.Fprintf(out, "! git-spice not found (required for stacking)\n")
 		_, _ = fmt.Fprintf(out, "  Install with: cargo install git-spice\n")
 		_, _ = fmt.Fprintf(out, "              or: brew install git-spice\n")
+		_ = checkGhCLI(ctx, out)
 		return true, false
 	}
 
 	version, err := spiceClient.GetVersion(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintf(out, "! git-spice installed but version check failed\n")
+		_ = checkGhCLI(ctx, out)
 		return true, false
 	}
 
 	_, _ = fmt.Fprintf(out, "✓ git-spice installed: %s\n", version)
+	_ = checkGhCLI(ctx, out)
 	return true, true
+}
+
+func checkGhCLI(ctx context.Context, out io.Writer) bool {
+	ghClient, err := git.NewGhClient()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, "⚠ gh CLI not found (optional, for squash-merge detection)")
+		_, _ = fmt.Fprintln(out, "  Install with: brew install gh")
+		_, _ = fmt.Fprintln(out, "  Then run: gh auth login")
+		return false
+	}
+
+	if !ghClient.IsAvailable() {
+		_, _ = fmt.Fprintln(out, "⚠ gh CLI unavailable (optional, for squash-merge detection)")
+		return false
+	}
+
+	cmd := exec.CommandContext(ctx, "gh", "auth", "status")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		_, _ = fmt.Fprintln(out, "⚠ gh CLI installed but not authenticated")
+		_, _ = fmt.Fprintln(out, "  Run: gh auth login")
+		return false
+	}
+
+	_, _ = fmt.Fprintln(out, "✓ gh CLI installed and authenticated")
+	return true
 }
 
 // checkTimeoutCommand checks for timeout/gtimeout availability
