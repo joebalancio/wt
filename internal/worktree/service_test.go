@@ -35,6 +35,11 @@ type mockGitClient struct {
 	listAllBranchesFunc    func(ctx context.Context) ([]string, error)
 }
 
+type mockGitClientWithDetection struct {
+	*mockGitClient
+	isBranchMergedWithDetectionFunc func(ctx context.Context, branch string, ghClient *git.GhClient) (bool, error)
+}
+
 func (m *mockGitClient) ListWorktrees(ctx context.Context) ([]*domain.Worktree, error) {
 	if m.listWorktreesFunc != nil {
 		return m.listWorktreesFunc(ctx)
@@ -138,6 +143,13 @@ func (m *mockGitClient) ListAllBranches(ctx context.Context) ([]string, error) {
 		return m.listAllBranchesFunc(ctx)
 	}
 	return []string{"main"}, nil
+}
+
+func (m *mockGitClientWithDetection) IsBranchMergedWithDetection(ctx context.Context, branch string, ghClient *git.GhClient) (bool, error) {
+	if m.isBranchMergedWithDetectionFunc != nil {
+		return m.isBranchMergedWithDetectionFunc(ctx, branch, ghClient)
+	}
+	return false, nil
 }
 
 func TestService_List(t *testing.T) {
@@ -629,6 +641,55 @@ func TestService_RemoveEnhanced(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "not merged") {
 			t.Errorf("expected 'not merged' error, got: %v", err)
+		}
+	})
+
+	t.Run("uses enhanced merge detection when available", func(t *testing.T) {
+		var removeCalled bool
+		base := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/feat", Branch: "feat"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			isWorktreeDirtyFunc: func(_ context.Context, _ string) (bool, error) {
+				return false, nil
+			},
+			// Legacy check fails for squash merges.
+			isBranchMergedFunc: func(_ context.Context, _ string) (bool, error) {
+				return false, nil
+			},
+			removeWorktreeFunc: func(_ context.Context, _ string, _ bool) error {
+				removeCalled = true
+				return nil
+			},
+			deleteBranchFunc: func(_ context.Context, _ string, _ bool) error {
+				return nil
+			},
+		}
+		mock := &mockGitClientWithDetection{
+			mockGitClient: base,
+			isBranchMergedWithDetectionFunc: func(_ context.Context, _ string, _ *git.GhClient) (bool, error) {
+				return true, nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		err = svc.RemoveEnhanced(context.Background(), "/worktrees/feat", domain.ForceNone)
+		if err != nil {
+			t.Fatalf("RemoveEnhanced() error = %v", err)
+		}
+		if !removeCalled {
+			t.Error("RemoveWorktree was not called")
 		}
 	})
 
