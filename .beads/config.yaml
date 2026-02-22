@@ -41,4 +41,6 @@
 # - github.org
 # - github.repo
 
-sync.mode: "dolt-native"
+backend: dolt
+sync:
+  mode: "dolt-native"
