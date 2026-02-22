@@ -293,6 +293,23 @@ func (c *Client) IsBranchMerged(ctx context.Context, branch string) (bool, error
 	return true, nil
 }
 
+// IsBranchMergedWithDetection checks if a branch is merged using layered detection.
+func (c *Client) IsBranchMergedWithDetection(ctx context.Context, branch string, ghClient *GhClient) (bool, error) {
+	if ghClient != nil && ghClient.IsAvailable() {
+		merged, err := ghClient.IsBranchPRMerged(ctx, branch)
+		if err == nil {
+			return merged, nil
+		}
+	}
+
+	merged, err := c.IsBranchCherryMerged(ctx, branch)
+	if err == nil {
+		return merged, nil
+	}
+
+	return c.IsBranchMerged(ctx, branch)
+}
+
 // IsBranchCherryMerged checks if all commits from a branch have equivalent patches
 // in the default branch using git cherry.
 func (c *Client) IsBranchCherryMerged(ctx context.Context, branch string) (bool, error) {

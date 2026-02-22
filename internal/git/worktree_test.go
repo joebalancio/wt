@@ -248,3 +248,55 @@ func TestClient_IsBranchCherryMerged_Integration(t *testing.T) {
 		t.Error("IsBranchCherryMerged() = false, want true (cherry-picked commit should be detected)")
 	}
 }
+
+func TestClient_IsBranchMerged_TwoTierDetection(t *testing.T) {
+	skipIfNoGit(t)
+
+	tempDir := t.TempDir()
+	runGitCommand(t, tempDir, "init", "-b", "main")
+	runGitCommand(t, tempDir, "config", "user.name", "Test User")
+	runGitCommand(t, tempDir, "config", "user.email", "test@example.com")
+
+	testFile := filepath.Join(tempDir, "README.md")
+	if err := os.WriteFile(testFile, []byte("# Test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitCommand(t, tempDir, "add", "README.md")
+	runGitCommand(t, tempDir, "commit", "-m", "Initial commit")
+
+	runGitCommand(t, tempDir, "checkout", "-b", "feature/test")
+	if err := os.WriteFile(testFile, []byte("# Test\n\nFeature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitCommand(t, tempDir, "add", "README.md")
+	runGitCommand(t, tempDir, "commit", "-m", "Add feature")
+
+	runGitCommand(t, tempDir, "checkout", "main")
+	runGitCommand(t, tempDir, "merge", "--squash", "feature/test")
+	runGitCommand(t, tempDir, "commit", "-m", "Squash merge feature/test")
+
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(originalWd)
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	ghClient, _ := NewGhClient()
+
+	merged, err := client.IsBranchMergedWithDetection(context.Background(), "feature/test", ghClient)
+	if err != nil {
+		t.Fatalf("IsBranchMergedWithDetection() error = %v", err)
+	}
+
+	if !merged {
+		t.Error("IsBranchMergedWithDetection() = false, want true (squash-merged branch should be detected)")
+	}
+}
