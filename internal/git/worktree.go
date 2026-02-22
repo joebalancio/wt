@@ -293,6 +293,48 @@ func (c *Client) IsBranchMerged(ctx context.Context, branch string) (bool, error
 	return true, nil
 }
 
+// IsBranchCherryMerged checks if all commits from a branch have equivalent patches
+// in the default branch using git cherry.
+func (c *Client) IsBranchCherryMerged(ctx context.Context, branch string) (bool, error) {
+	repoInfo, err := c.GetRepoInfo(ctx)
+	if err != nil {
+		return false, fmt.Errorf("getting repo info: %w", err)
+	}
+
+	args := []string{"cherry", "-v", repoInfo.DefaultBranch, branch}
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.gitPath, args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("git cherry: %w: %s", err, stderr.String())
+	}
+
+	allMerged, _ := parseCherryOutput(stdout.String())
+	return allMerged, nil
+}
+
+// parseCherryOutput parses git cherry -v output.
+// Lines starting with '-' are merged, '+' are not merged.
+func parseCherryOutput(output string) (allMerged bool, unmergedCount int) {
+	allMerged = true
+	unmergedCount = 0
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		if line[0] == '+' {
+			allMerged = false
+			unmergedCount++
+		}
+	}
+
+	return allMerged, unmergedCount
+}
+
 // RemoteBranchExists checks if a branch exists on the remote.
 func (c *Client) RemoteBranchExists(ctx context.Context, remote, branch string) (bool, error) {
 	remoteRef := fmt.Sprintf("refs/remotes/%s/%s", remote, branch)
