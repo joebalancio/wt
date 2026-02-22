@@ -9,6 +9,7 @@ import (
 	"github.com/joebalancio/wt/internal/spice"
 	"github.com/joebalancio/wt/internal/stack"
 	"github.com/joebalancio/wt/internal/tmux"
+	"github.com/joebalancio/wt/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +20,9 @@ func NewStackCmd() *cobra.Command {
 		stackForce bool
 		noSetup    bool
 		run        string
+		path       string
+		track      string
+		noCheckout bool
 	)
 
 	cmd := &cobra.Command{
@@ -33,13 +37,16 @@ Examples:
   wt stack              # Creates: currentBranch-xY7k
   wt stack api          # Creates: currentBranch-api-k9P2
   wt stack api --run "claude"  # Run command after setup
+  wt stack api --path /custom  # Custom worktree path
+  wt stack api --track origin/api  # Track remote branch
+  wt stack api --no-checkout     # Skip checkout
 
 Template variables for --run:
   {worktree_path} - Path to the new worktree
   {branch} - Branch name`,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			runStackCommand(cmd, args, stackBase, stackForce, noSetup, run)
+			runStackCommand(cmd, args, stackBase, stackForce, noSetup, run, path, track, noCheckout)
 		},
 	}
 
@@ -47,16 +54,53 @@ Template variables for --run:
 	cmd.Flags().BoolVar(&stackForce, "force", false, "allow stacking on main/master")
 	cmd.Flags().BoolVar(&noSetup, "no-setup", false, "skip setup hooks and worktree creation")
 	cmd.Flags().StringVar(&run, "run", "", "command to run after hooks (e.g., 'claude')")
+	cmd.Flags().StringVar(&path, "path", "", "custom worktree path")
+	cmd.Flags().StringVar(&track, "track", "", "remote branch to track")
+	cmd.Flags().BoolVar(&noCheckout, "no-checkout", false, "don't checkout the branch")
 
 	return cmd
 }
 
-func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackForce bool, noSetup bool, run string) {
+func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackForce bool, noSetup bool, run string, path string, track string, noCheckout bool) {
 	ctx := context.Background()
 	out := cmd.OutOrStdout()
 
+	gitClient, err := git.NewClient()
+	if err != nil {
+		Fatal("Failed to create git client: %v", err)
+	}
+
+	inWorktree, mainRepoRoot, err := gitClient.IsInWorktree(ctx)
+	if err != nil {
+		Fatal("Failed to check worktree context: %v", err)
+	}
+	if inWorktree {
+		repoInfo, err := gitClient.GetRepoInfo(ctx)
+		currentPath := "unknown"
+		if err == nil {
+			currentPath = repoInfo.RootPath
+		}
+
+		name := ""
+		if len(args) > 0 {
+			name = args[0]
+		}
+
+		Fatal(`cannot stack from inside another worktree
+
+Current location: %s
+Main repository:  %s
+
+Run this command from the main repository instead:
+  cd %s && wt stack %s`,
+			currentPath,
+			mainRepoRoot,
+			mainRepoRoot,
+			name)
+	}
+
 	// Check for main/master protection
-	currentBranch, err := getCurrentBranchProtected(ctx)
+	currentBranch, err := gitClient.GetCurrentBranch(ctx)
 	if err != nil {
 		Fatal("Failed to get current branch: %v", err)
 	}
@@ -65,7 +109,7 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 		Fatal("Cannot stack on '%s'. Stack on feature branches only.\nUse --force to override.", currentBranch)
 	}
 
-	stackService := initStackService()
+	stackService, _ := initStackService()
 
 	// Get the optional name argument
 	var name string
@@ -90,12 +134,17 @@ func runStackCommand(cmd *cobra.Command, args []string, stackBase string, stackF
 
 	// Create worktree
 	if !noSetup {
-		createStackWorktree(ctx, cmd, stackService, stackBranch.Name, run)
+		worktreeSpec := stack.BranchSpec{
+			Path:       path,
+			Track:      track,
+			NoCheckout: noCheckout,
+		}
+		createStackWorktreeWithSpec(ctx, cmd, stackService, stackBranch.Name, worktreeSpec, run)
 	}
 }
 
-// initStackService initializes git client, config, and stack service
-func initStackService() *stack.Service {
+// initStackService initializes git client, config, worktree service, and stack service.
+func initStackService() (*stack.Service, *worktree.Service) {
 	gitClient, err := git.NewClient()
 	if err != nil {
 		Fatal("Failed to create git client: %v", err)
@@ -111,24 +160,29 @@ func initStackService() *stack.Service {
 		Fatal("%v", err)
 	}
 
+	worktreeSvc, err := worktree.NewService(gitClient, cfg)
+	if err != nil {
+		Fatal("Failed to create worktree service: %v", err)
+	}
+
 	spiceClient, err := spice.NewClient(cfg)
 	if err != nil {
 		Fatal("Failed to create spice client: %v", err)
 	}
 
-	stackService, err := stack.NewService(gitClient, spiceClient, cfg)
+	stackService, err := stack.NewService(gitClient, spiceClient, cfg, worktreeSvc)
 	if err != nil {
 		Fatal("Failed to create stack service: %v", err)
 	}
 
-	return stackService
+	return stackService, worktreeSvc
 }
 
-// createStackWorktree creates a worktree for the stack branch and sets up hooks and tmux
-func createStackWorktree(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName, runCmd string) {
+// createStackWorktreeWithSpec creates a worktree for the stack branch and sets up hooks and tmux.
+func createStackWorktreeWithSpec(ctx context.Context, cmd *cobra.Command, stackService *stack.Service, branchName string, spec stack.BranchSpec, runCmd string) {
 	out := cmd.OutOrStdout()
 
-	worktree, err := stackService.CreateWorktree(ctx, branchName)
+	worktree, err := stackService.CreateWorktreeWithSpec(ctx, branchName, spec)
 	if err != nil {
 		Fatal("Failed to create worktree: %v", err)
 	}
@@ -192,33 +246,7 @@ func NewStackListCmd() *cobra.Command {
 			ctx := context.Background()
 			out := cmd.OutOrStdout()
 
-			// Create clients
-			gitClient, err := git.NewClient()
-			if err != nil {
-				Fatal("Failed to create git client: %v", err)
-			}
-
-			// Load config
-			cfg, err := loadConfigForCommand()
-			if err != nil {
-				Fatal("Failed to load config: %v", err)
-			}
-
-			// Validate git-spice configuration early
-			if err := validateGitSpiceConfig(cfg); err != nil {
-				Fatal("%v", err)
-			}
-
-			spiceClient, err := spice.NewClient(cfg)
-			if err != nil {
-				Fatal("Failed to create spice client: %v", err)
-			}
-
-			// Create stack service
-			stackService, err := stack.NewService(gitClient, spiceClient, cfg)
-			if err != nil {
-				Fatal("Failed to create stack service: %v", err)
-			}
+			stackService, _ := initStackService()
 
 			// Get stack with worktree paths
 			branches, err := stackService.GetStack(ctx)
@@ -227,6 +255,10 @@ func NewStackListCmd() *cobra.Command {
 			}
 
 			// Get current branch for highlighting
+			gitClient, err := git.NewClient()
+			if err != nil {
+				Fatal("Failed to create git client: %v", err)
+			}
 			currentBranch, _ := gitClient.GetCurrentBranch(ctx)
 			for _, branch := range branches {
 				if branch.Name == currentBranch {
@@ -243,14 +275,6 @@ func NewStackListCmd() *cobra.Command {
 	}
 
 	return cmd
-}
-
-func getCurrentBranchProtected(ctx context.Context) (string, error) {
-	gitClient, err := git.NewClient()
-	if err != nil {
-		return "", err
-	}
-	return gitClient.GetCurrentBranch(ctx)
 }
 
 func isProtectedBranch(branch string) bool {
