@@ -92,6 +92,32 @@ func (s *Service) Add(ctx context.Context, spec domain.WorktreeCreateSpec) (*dom
 	return worktree, nil
 }
 
+// GetOrCreate returns an existing worktree for the branch or creates a new one.
+// Returns (worktree, created, error) where created is true if a new worktree was created.
+func (s *Service) GetOrCreate(ctx context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, bool, error) {
+	if spec.Branch == "" {
+		return nil, false, fmt.Errorf("branch is required")
+	}
+
+	// Check if a worktree already exists for this branch
+	existingWorktrees, err := s.List(ctx, &domain.WorktreeFilter{Branches: []string{spec.Branch}})
+	if err != nil {
+		return nil, false, fmt.Errorf("checking existing worktrees: %w", err)
+	}
+
+	if len(existingWorktrees) > 0 {
+		// Worktree exists - return it
+		return existingWorktrees[0], false, nil
+	}
+
+	// No worktree exists - create new one
+	worktree, err := s.Add(ctx, spec)
+	if err != nil {
+		return nil, false, err
+	}
+	return worktree, true, nil
+}
+
 // ResolvePath returns the worktree path for a branch.
 // If explicitPath is provided, it's used as-is.
 // Otherwise, path is resolved from config based on worktree.location setting.

@@ -315,6 +315,145 @@ func TestService_Add(t *testing.T) {
 	})
 }
 
+func TestService_GetOrCreate(t *testing.T) {
+	t.Run("returns error when branch is empty", func(t *testing.T) {
+		mock := &mockGitClient{}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		spec := domain.WorktreeCreateSpec{Branch: ""}
+		_, _, err = svc.GetOrCreate(context.Background(), spec)
+		if err == nil {
+			t.Fatal("GetOrCreate() expected error for empty branch, got nil")
+		}
+		if err.Error() != "branch is required" {
+			t.Errorf("expected 'branch is required', got %q", err.Error())
+		}
+	})
+
+	t.Run("returns existing worktree when branch already has one", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+					{Path: "/worktrees/existing-feature", Branch: "existing-feature"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		spec := domain.WorktreeCreateSpec{Branch: "existing-feature"}
+		worktree, created, err := svc.GetOrCreate(context.Background(), spec)
+		if err != nil {
+			t.Fatalf("GetOrCreate() error = %v", err)
+		}
+		if created {
+			t.Error("expected created=false for existing worktree, got true")
+		}
+		if worktree.Branch != "existing-feature" {
+			t.Errorf("got branch %s, want existing-feature", worktree.Branch)
+		}
+		if worktree.Path != "/worktrees/existing-feature" {
+			t.Errorf("got path %s, want /worktrees/existing-feature", worktree.Path)
+		}
+	})
+
+	t.Run("creates new worktree when branch has none", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{
+					{Path: "/repo", Branch: "main"},
+				}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			addWorktreeFunc: func(_ context.Context, spec domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+				return &domain.Worktree{
+					Path:   "/worktrees/" + spec.Branch,
+					Branch: spec.Branch,
+				}, nil
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		spec := domain.WorktreeCreateSpec{Branch: "new-feature"}
+		worktree, created, err := svc.GetOrCreate(context.Background(), spec)
+		if err != nil {
+			t.Fatalf("GetOrCreate() error = %v", err)
+		}
+		if !created {
+			t.Error("expected created=true for new worktree, got false")
+		}
+		if worktree.Branch != "new-feature" {
+			t.Errorf("got branch %s, want new-feature", worktree.Branch)
+		}
+	})
+
+	t.Run("returns error when listing worktrees fails", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return nil, fmt.Errorf("git error")
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		spec := domain.WorktreeCreateSpec{Branch: "some-branch"}
+		_, _, err = svc.GetOrCreate(context.Background(), spec)
+		if err == nil {
+			t.Fatal("GetOrCreate() expected error when listing fails, got nil")
+		}
+	})
+
+	t.Run("returns error when creating worktree fails", func(t *testing.T) {
+		mock := &mockGitClient{
+			listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+				return []*domain.Worktree{{Path: "/repo", Branch: "main"}}, nil
+			},
+			getRepoInfoFunc: func(_ context.Context) (*domain.GitRepo, error) {
+				return &domain.GitRepo{RootPath: "/repo", DefaultBranch: "main"}, nil
+			},
+			addWorktreeFunc: func(_ context.Context, _ domain.WorktreeCreateSpec) (*domain.Worktree, error) {
+				return nil, fmt.Errorf("git worktree add failed")
+			},
+		}
+
+		cfg := config.DefaultConfig()
+		svc, err := NewService(mock, cfg)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+
+		spec := domain.WorktreeCreateSpec{Branch: "new-feature"}
+		_, _, err = svc.GetOrCreate(context.Background(), spec)
+		if err == nil {
+			t.Fatal("GetOrCreate() expected error when creation fails, got nil")
+		}
+	})
+}
+
 func TestService_Remove(t *testing.T) {
 	t.Run("removes worktree", func(t *testing.T) {
 		mock := &mockGitClient{
