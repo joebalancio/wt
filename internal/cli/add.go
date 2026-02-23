@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/joebalancio/wt/internal/git"
 	"github.com/joebalancio/wt/internal/picker"
@@ -117,6 +118,15 @@ Run this command from the main repository instead:
 		Fatal("Failed to create service: %v", err)
 	}
 
+	// Get or create worktree
+	wt := getOrCreateWorktree(ctx, svc, branch, base, path, force, track, noCheckout, cmd.OutOrStdout())
+
+	// Setup tmux window and run hooks
+	setupWorktreeWithTmux(ctx, cmd, wt.Branch, wt.Path, run)
+}
+
+// getOrCreateWorktree returns an existing worktree for the branch or creates a new one
+func getOrCreateWorktree(ctx context.Context, svc *worktree.Service, branch, base, path string, force bool, track string, noCheckout bool, stdout interface{ io.Writer }) *domain.Worktree {
 	spec := domain.WorktreeCreateSpec{
 		Branch:   branch,
 		Base:     base,
@@ -129,17 +139,22 @@ Run this command from the main repository instead:
 		spec.Track = &track
 	}
 
-	wt, err := svc.Add(ctx, spec)
+	wt, created, err := svc.GetOrCreate(ctx, spec)
 	if err != nil {
-		Fatal("Failed to add worktree: %v", err)
+		Fatal("Failed to get or create worktree: %v", err)
 	}
 
-	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Created worktree: %s [%s]\n", wt.Path, wt.Branch); err != nil {
-		Fatal("Failed to write output: %v", err)
+	// Output appropriate message
+	if created {
+		if _, err := fmt.Fprintf(stdout, "Created worktree: %s [%s]\n", wt.Path, wt.Branch); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
+	} else {
+		if _, err := fmt.Fprintf(stdout, "Selected worktree: %s [%s]\n", wt.Path, wt.Branch); err != nil {
+			Fatal("Failed to write output: %v", err)
+		}
 	}
-
-	// Setup tmux window and run hooks
-	setupWorktreeWithTmux(ctx, cmd, wt.Branch, wt.Path, run)
+	return wt
 }
 
 // setupWorktreeWithTmux creates tmux window before running hooks
