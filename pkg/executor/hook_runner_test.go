@@ -135,6 +135,23 @@ func TestHookRunner_IsTmuxMode(t *testing.T) {
 	}
 }
 
+func TestWithFinalCommand(t *testing.T) {
+	runner := NewHookRunner("/tmp", WithFinalCommand("claude"))
+	if runner == nil {
+		t.Fatal("NewHookRunner() returned nil")
+	}
+	if runner.finalCommand != "claude" {
+		t.Errorf("finalCommand = %v, want claude", runner.finalCommand)
+	}
+}
+
+func TestWithFinalCommand_Empty(t *testing.T) {
+	runner := NewHookRunner("/tmp", WithFinalCommand(""))
+	if runner.finalCommand != "" {
+		t.Errorf("finalCommand = %v, want empty", runner.finalCommand)
+	}
+}
+
 func TestHookRunner_RunHook_TmuxMode(t *testing.T) {
 	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
 		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
