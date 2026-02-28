@@ -111,10 +111,29 @@ func (h *HookRunner) substituteTemplates(cmd string) string {
 
 // RunHooks executes all hooks in sequence
 func (h *HookRunner) RunHooks(ctx context.Context, hooks []config.Hook) error {
+	// In tmux mode with potential finalCommand, use compound command
+	if h.isTmuxMode() {
+		return h.runHooksInTmuxCompound(hooks)
+	}
+
+	// Local mode: hooks block, so no race condition
 	for i, hook := range hooks {
 		if err := h.RunHook(ctx, hook); err != nil {
 			return fmt.Errorf("hook %d failed: %w", i, err)
 		}
+	}
+	return nil
+}
+
+// runHooksInTmuxCompound executes all hooks and finalCommand as a single compound command
+func (h *HookRunner) runHooksInTmuxCompound(hooks []config.Hook) error {
+	compoundCmd := h.buildCompoundCommand(hooks)
+	if compoundCmd == "" {
+		return nil // Nothing to run
+	}
+
+	if err := h.tmuxClient.RunInWindow(h.windowName, compoundCmd); err != nil {
+		return fmt.Errorf("running compound command in tmux: %w", err)
 	}
 	return nil
 }

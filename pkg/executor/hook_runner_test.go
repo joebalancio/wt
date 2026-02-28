@@ -232,6 +232,21 @@ func TestBuildCompoundCommand(t *testing.T) {
 	}
 }
 
+func TestHookRunner_RunHooks_LocalModeUnchanged(t *testing.T) {
+	// Verify local mode behavior is unchanged (hooks block)
+	runner := NewHookRunner("/tmp")
+
+	hooks := []config.Hook{
+		{Run: "echo hook1"},
+		{Run: "echo hook2"},
+	}
+
+	err := runner.RunHooks(context.Background(), hooks)
+	if err != nil {
+		t.Errorf("RunHooks() in local mode error = %v", err)
+	}
+}
+
 func TestHookRunner_RunHook_TmuxMode(t *testing.T) {
 	if os.Getenv("WT_INTEGRATION_TEST") != "1" {
 		t.Skip("set WT_INTEGRATION_TEST=1 to run integration tests")
