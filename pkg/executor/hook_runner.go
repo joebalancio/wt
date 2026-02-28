@@ -182,3 +182,29 @@ func (h *HookRunner) runHookInTmux(hook config.Hook, command, cwd string, timeou
 	}
 	return nil
 }
+
+// buildCompoundCommand builds a single compound command from hooks and finalCommand.
+// Each hook runs in a subshell to preserve its cwd and timeout.
+// Commands are chained with && for fail-fast behavior.
+func (h *HookRunner) buildCompoundCommand(hooks []config.Hook) string {
+	var parts []string
+	timeoutBin := detectTimeoutCommand()
+
+	for _, hook := range hooks {
+		cwd := h.substituteTemplates(hook.Cwd)
+		if cwd == "" {
+			cwd = h.workingDir
+		}
+		timeout, _ := hook.ParseTimeout()
+		cmd := h.substituteTemplates(hook.Run)
+
+		timedCmd := buildTimedCommand(timeoutBin, timeout, cmd)
+		parts = append(parts, fmt.Sprintf("(cd %s && %s)", cwd, timedCmd))
+	}
+
+	if h.finalCommand != "" {
+		parts = append(parts, fmt.Sprintf("(cd %s && %s)", h.workingDir, h.finalCommand))
+	}
+
+	return strings.Join(parts, " && ")
+}

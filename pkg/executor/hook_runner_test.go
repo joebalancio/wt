@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,6 +150,85 @@ func TestWithFinalCommand_Empty(t *testing.T) {
 	runner := NewHookRunner("/tmp", WithFinalCommand(""))
 	if runner.finalCommand != "" {
 		t.Errorf("finalCommand = %v, want empty", runner.finalCommand)
+	}
+}
+
+func TestBuildCompoundCommand(t *testing.T) {
+	tests := []struct {
+		name         string
+		workingDir   string
+		hooks        []config.Hook
+		finalCommand string
+		wantContains []string // substrings that should appear in output
+	}{
+		{
+			name:         "no hooks no final command",
+			workingDir:   "/tmp/worktree",
+			hooks:        nil,
+			finalCommand: "",
+			wantContains: nil, // empty result
+		},
+		{
+			name:         "no hooks with final command",
+			workingDir:   "/tmp/worktree",
+			hooks:        nil,
+			finalCommand: "claude",
+			wantContains: []string{"(cd /tmp/worktree && claude)"},
+		},
+		{
+			name:         "one hook no final command",
+			workingDir:   "/tmp/worktree",
+			hooks: []config.Hook{
+				{Run: "npm install"},
+			},
+			finalCommand: "",
+			wantContains: []string{"(cd /tmp/worktree &&", "npm install)"},
+		},
+		{
+			name:       "multiple hooks with final command",
+			workingDir: "/tmp/worktree",
+			hooks: []config.Hook{
+				{Run: "npm install"},
+				{Run: "direnv allow"},
+			},
+			finalCommand: "claude",
+			wantContains: []string{
+				"(cd /tmp/worktree &&",
+				"npm install)",
+				"&&",
+				"direnv allow)",
+				"claude)",
+			},
+		},
+		{
+			name:       "hook with custom cwd",
+			workingDir: "/tmp/worktree",
+			hooks: []config.Hook{
+				{Run: "npm install", Cwd: "/tmp/worktree/frontend"},
+			},
+			finalCommand: "",
+			wantContains: []string{"(cd /tmp/worktree/frontend &&"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := NewHookRunner(tt.workingDir, WithFinalCommand(tt.finalCommand))
+			got := runner.buildCompoundCommand(tt.hooks)
+
+			if tt.wantContains == nil {
+				if got != "" {
+					t.Errorf("buildCompoundCommand() = %q, want empty", got)
+				}
+				return
+			}
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(got, want) {
+					t.Errorf("buildCompoundCommand() = %q, want to contain %q", got, want)
+				}
+			}
+		})
 	}
 }
 
