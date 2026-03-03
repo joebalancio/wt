@@ -86,17 +86,6 @@ func runSetupHooks(ctx context.Context, worktreePath string) error {
 	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
 }
 
-// runSetupHooksInWindow executes post-create hooks in a tmux window
-func runSetupHooksInWindow(ctx context.Context, worktreePath string, tmuxClient *tmux.Client, windowName string) error {
-	cfg, err := loadConfigForCommand()
-	if err != nil {
-		return err
-	}
-
-	runner := executor.NewHookRunner(worktreePath, executor.WithTmux(tmuxClient, windowName))
-	return runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate)
-}
-
 func runSetupHooksWithWarning(ctx context.Context, cmd *cobra.Command, worktreePath string) {
 	if err := runSetupHooks(ctx, worktreePath); err != nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)

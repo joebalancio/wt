@@ -45,6 +45,7 @@ type HookRunner struct {
 	templateVars map[string]string
 	tmuxClient   *tmux.Client // nil = run locally
 	windowName   string       // used if tmuxClient is set
+	finalCommand string       // command to run after all hooks (tmux mode only)
 }
 
 // HookRunnerOption configures a HookRunner
@@ -64,6 +65,13 @@ func WithTemplateVars(vars map[string]string) HookRunnerOption {
 		for k, v := range vars {
 			hr.templateVars[k] = v
 		}
+	}
+}
+
+// WithFinalCommand sets a command to execute after all hooks complete (tmux mode only)
+func WithFinalCommand(cmd string) HookRunnerOption {
+	return func(hr *HookRunner) {
+		hr.finalCommand = cmd
 	}
 }
 
@@ -103,10 +111,29 @@ func (h *HookRunner) substituteTemplates(cmd string) string {
 
 // RunHooks executes all hooks in sequence
 func (h *HookRunner) RunHooks(ctx context.Context, hooks []config.Hook) error {
+	// In tmux mode with potential finalCommand, use compound command
+	if h.isTmuxMode() {
+		return h.runHooksInTmuxCompound(hooks)
+	}
+
+	// Local mode: hooks block, so no race condition
 	for i, hook := range hooks {
 		if err := h.RunHook(ctx, hook); err != nil {
 			return fmt.Errorf("hook %d failed: %w", i, err)
 		}
+	}
+	return nil
+}
+
+// runHooksInTmuxCompound executes all hooks and finalCommand as a single compound command
+func (h *HookRunner) runHooksInTmuxCompound(hooks []config.Hook) error {
+	compoundCmd := h.buildCompoundCommand(hooks)
+	if compoundCmd == "" {
+		return nil // Nothing to run
+	}
+
+	if err := h.tmuxClient.RunInWindow(h.windowName, compoundCmd); err != nil {
+		return fmt.Errorf("running compound command in tmux: %w", err)
 	}
 	return nil
 }
@@ -173,4 +200,30 @@ func (h *HookRunner) runHookInTmux(hook config.Hook, command, cwd string, timeou
 		return fmt.Errorf("running %q in tmux: %w", hook.Run, err)
 	}
 	return nil
+}
+
+// buildCompoundCommand builds a single compound command from hooks and finalCommand.
+// Each hook runs in a subshell to preserve its cwd and timeout.
+// Commands are chained with && for fail-fast behavior.
+func (h *HookRunner) buildCompoundCommand(hooks []config.Hook) string {
+	var parts []string
+	timeoutBin := detectTimeoutCommand()
+
+	for _, hook := range hooks {
+		cwd := h.substituteTemplates(hook.Cwd)
+		if cwd == "" {
+			cwd = h.workingDir
+		}
+		timeout, _ := hook.ParseTimeout()
+		cmd := h.substituteTemplates(hook.Run)
+
+		timedCmd := buildTimedCommand(timeoutBin, timeout, cmd)
+		parts = append(parts, fmt.Sprintf("(cd %s && %s)", cwd, timedCmd))
+	}
+
+	if h.finalCommand != "" {
+		parts = append(parts, fmt.Sprintf("(cd %s && %s)", h.workingDir, h.finalCommand))
+	}
+
+	return strings.Join(parts, " && ")
 }

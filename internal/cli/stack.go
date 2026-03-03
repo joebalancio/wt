@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/joebalancio/wt/internal/config"
 	"github.com/joebalancio/wt/internal/git"
@@ -10,6 +11,7 @@ import (
 	"github.com/joebalancio/wt/internal/stack"
 	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/internal/worktree"
+	"github.com/joebalancio/wt/pkg/executor"
 	"github.com/spf13/cobra"
 )
 
@@ -218,20 +220,29 @@ func createStackWorktreeWithSpec(ctx context.Context, cmd *cobra.Command, stackS
 	// Select the window
 	_ = tmuxClient.SelectWindow(windowName)
 
-	// Run hooks INSIDE the new window
-	if err := runSetupHooksInWindow(ctx, worktree.Path, tmuxClient, windowName); err != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
-	}
+	finalCommand := ""
 	if runCmd != "" {
-		_ = runCommandAfterHooks(RunCommandOpts{
-			Command:       runCmd,
-			WorktreePath:  worktree.Path,
-			Branch:        branchName,
-			WindowName:    windowName,
-			TmuxClient:    tmuxClient,
-			WindowExisted: windowExisted,
-			InTmux:        true,
-		})
+		if windowExisted {
+			fmt.Printf("--run skipped: window '%s' already exists\n", windowName)
+		} else {
+			finalCommand = expandRunTemplate(runCmd, worktree.Path)
+			finalCommand = strings.ReplaceAll(finalCommand, "{branch}", branchName)
+		}
+	}
+
+	cfg, err := loadConfigForCommand()
+	if err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to load config: %v\n", err)
+		return
+	}
+
+	runner := executor.NewHookRunner(
+		worktree.Path,
+		executor.WithTmux(tmuxClient, windowName),
+		executor.WithFinalCommand(finalCommand),
+	)
+	if err := runner.RunHooks(ctx, cfg.Hooks.OnWorktreeCreate); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Setup hooks failed: %v\n", err)
 	}
 }
 
