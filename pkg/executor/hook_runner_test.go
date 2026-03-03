@@ -176,8 +176,8 @@ func TestBuildCompoundCommand(t *testing.T) {
 			wantContains: []string{"(cd /tmp/worktree && claude)"},
 		},
 		{
-			name:         "one hook no final command",
-			workingDir:   "/tmp/worktree",
+			name:       "one hook no final command",
+			workingDir: "/tmp/worktree",
 			hooks: []config.Hook{
 				{Run: "npm install"},
 			},

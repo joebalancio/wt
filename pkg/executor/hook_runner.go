@@ -41,11 +41,11 @@ func buildTimedCommand(timeoutBin string, d time.Duration, command string) strin
 
 // HookRunner executes post-create hooks
 type HookRunner struct {
-	workingDir    string
-	templateVars  map[string]string
-	tmuxClient    *tmux.Client // nil = run locally
-	windowName    string       // used if tmuxClient is set
-	finalCommand  string       // command to run after all hooks (tmux mode only)
+	workingDir   string
+	templateVars map[string]string
+	tmuxClient   *tmux.Client // nil = run locally
+	windowName   string       // used if tmuxClient is set
+	finalCommand string       // command to run after all hooks (tmux mode only)
 }
 
 // HookRunnerOption configures a HookRunner
