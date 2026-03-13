@@ -7,12 +7,12 @@ import (
 	"github.com/joebalancio/wt/internal/picker"
 )
 
-func TestIsPickerCancelled(t *testing.T) {
-	if !isPickerCancelled(picker.ErrCancelled) {
-		t.Fatal("ErrCancelled should be recognized as a picker cancellation")
+func TestIsPickerCanceled(t *testing.T) {
+	if !isPickerCanceled(picker.ErrCanceled) {
+		t.Fatal("ErrCanceled should be recognized as a picker cancellation")
 	}
 
-	if isPickerCancelled(errors.New("boom")) {
+	if isPickerCanceled(errors.New("boom")) {
 		t.Fatal("non-picker error should not be recognized as a picker cancellation")
 	}
 }

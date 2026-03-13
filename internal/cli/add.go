@@ -102,7 +102,7 @@ Run this command from the main repository instead:
 		p := picker.NewPicker(gitClient)
 		result, err := p.SelectBranch(ctx)
 		if err != nil {
-			if isPickerCancelled(err) {
+			if isPickerCanceled(err) {
 				return
 			}
 			Fatal("Branch selection failed: %v", err)

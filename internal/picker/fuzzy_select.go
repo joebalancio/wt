@@ -16,8 +16,8 @@ import (
 	"golang.org/x/term"
 )
 
-// ErrCancelled reports an explicit user cancellation.
-var ErrCancelled = errors.New("selection canceled")
+// ErrCanceled reports an explicit user cancellation.
+var ErrCanceled = errors.New("selection canceled")
 
 var (
 	selectedStyle = lipgloss.NewStyle().Bold(true).Reverse(true)
@@ -209,7 +209,7 @@ func (m *FuzzySelect) totalOptions() int {
 // Run executes the picker program and returns the selected item.
 func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
 	if m.canceled {
-		return nil, ErrCancelled
+		return nil, ErrCanceled
 	}
 	if m.chosen != nil {
 		return m.chosen, nil
@@ -226,7 +226,7 @@ func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
 		return nil, fmt.Errorf("run fuzzy select: unexpected model type %T", finalModel)
 	}
 	if result.canceled {
-		return nil, ErrCancelled
+		return nil, ErrCanceled
 	}
 	if result.chosen == nil {
 		return nil, errors.New("fuzzy select finished without a selection")

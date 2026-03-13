@@ -200,7 +200,7 @@ func TestFuzzySelect_VisibleEntries_PreservesMatchedIndexes(t *testing.T) {
 	}
 }
 
-func TestFuzzySelect_Run_ShortCircuitsChosenAndCancelled(t *testing.T) {
+func TestFuzzySelect_Run_ShortCircuitsChosenAndCanceled(t *testing.T) {
 	model := NewFuzzySelect("Select:", []FuzzyItem{
 		{Label: "main", Value: "main"},
 	}, nil)
@@ -220,8 +220,8 @@ func TestFuzzySelect_Run_ShortCircuitsChosenAndCancelled(t *testing.T) {
 	aborted.canceled = true
 
 	item, err = aborted.Run(context.Background())
-	if !errors.Is(err, ErrCancelled) {
-		t.Fatalf("Run() err = %v, want ErrCancelled", err)
+	if !errors.Is(err, ErrCanceled) {
+		t.Fatalf("Run() err = %v, want ErrCanceled", err)
 	}
 	if item != nil {
 		t.Fatalf("Run() item = %#v, want nil", item)

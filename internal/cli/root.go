@@ -119,8 +119,8 @@ func Warn(format string, args ...interface{}) {
 	_, _ = fmt.Fprintf(os.Stderr, "Warning: "+format+"\n", args...)
 }
 
-func isPickerCancelled(err error) bool {
-	return errors.Is(err, picker.ErrCancelled)
+func isPickerCanceled(err error) bool {
+	return errors.Is(err, picker.ErrCanceled)
 }
 
 // expandRunTemplate expands template variables in a run command.

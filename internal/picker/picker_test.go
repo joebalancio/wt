@@ -180,12 +180,12 @@ func TestPicker_SelectBranch_PropagatesCancellation(t *testing.T) {
 	picker := NewPicker(mock)
 
 	withStubbedFuzzyRunner(t, func(_ context.Context, _ string, _ []FuzzyItem, _ []FuzzyItem) (*FuzzyItem, error) {
-		return nil, ErrCancelled
+		return nil, ErrCanceled
 	})
 
 	_, err := picker.SelectBranch(context.Background())
-	if !errors.Is(err, ErrCancelled) {
-		t.Fatalf("err = %v, want ErrCancelled", err)
+	if !errors.Is(err, ErrCanceled) {
+		t.Fatalf("err = %v, want ErrCanceled", err)
 	}
 }
 
