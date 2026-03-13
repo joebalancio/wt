@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace `huh.Select` with a custom bubbletea `FuzzySelect` component that provides fuzzy matching and a pinned text input that never scrolls away.
+**Goal:** Replace `huh.Select` in the picker flow with a custom Bubble Tea fuzzy picker that keeps the filter input pinned and supports fuzzy matching for branches and worktrees.
 
-**Architecture:** Create a self-contained `FuzzySelect` bubbletea model in `internal/picker/fuzzy_select.go` using `sahilm/fuzzy` for matching. The component manages text input, filtered list, and viewport internally. Integration points in `picker.go` remain unchanged — only the internal implementation switches from `huh.Select` to `FuzzySelect`.
+**Architecture:** Add a self-contained `FuzzySelect` model in `internal/picker/fuzzy_select.go` that owns text input, fuzzy ranking, selection state, rendering, and Bubble Tea execution. Keep `Picker`’s public API unchanged, and add one small package-level test seam in `picker.go` so integration tests can verify item wiring without driving an interactive TUI.
 
-**Tech Stack:** Go 1.22, bubbletea, bubbles (textinput, viewport), lipgloss, sahilm/fuzzy
+**Tech Stack:** Go 1.22.2, Bubble Tea, Bubbles (`textinput`, `viewport`), Lip Gloss, `sahilm/fuzzy`, `huh` for single-line text entry only
 
 ---
 
@@ -14,67 +14,73 @@
 
 | File | Responsibility |
 |------|----------------|
-| `internal/picker/fuzzy_select.go` | **New** — FuzzySelect bubbletea component with pinned input, fuzzy matching, viewport |
-| `internal/picker/fuzzy_select_test.go` | **New** — Unit tests for fuzzy matching logic, component state, cancellation |
-| `internal/picker/picker.go` | **Modified** — Replace `huh.Select` calls with `FuzzySelect` in SelectBranch, SelectWorktree, promptNewBranch |
-| `internal/picker/picker_test.go` | **Modified** — Add tests for FuzzySelect integration |
-| `go.mod` | **Modified** — Add `sahilm/fuzzy` dependency |
-| `go.sum` | **Modified** — Updated checksums |
+| `internal/picker/fuzzy_select.go` | New fuzzy picker model, filtering helpers, rendering, and `Run(context.Context)` |
+| `internal/picker/fuzzy_select_test.go` | Unit tests for filtering, ranking, navigation, cancellation, rendering, and `Run` short-circuit behavior |
+| `internal/picker/picker.go` | Replace `huh.Select` usage with `FuzzySelect`; add a narrow injectable runner seam for tests |
+| `internal/picker/picker_test.go` | Verify `Picker` still handles git errors and now builds the right fuzzy picker inputs/results |
+| `go.mod` | Add direct dependencies needed by the new picker |
+| `go.sum` | Checksum updates from dependency changes |
 
----
+## Design Constraints
 
-## Chunk 1: Add Dependency and Create FuzzySelect Types
+- Keep `SelectWorktree(ctx)` and `SelectBranch(ctx)` signatures unchanged.
+- Keep `promptNewBranch`’s name-entry step on `huh.NewInput()`.
+- Return a package sentinel `ErrCancelled` from the custom picker on Esc / Ctrl+C.
+- Empty filter must show all non-pinned items in original order.
+- Pinned items must always render at the top and never participate in fuzzy matching.
+- `Picker` tests must stay non-interactive.
 
-### Task 1: Add sahilm/fuzzy Dependency
+## Chunk 1: Build and Verify the FuzzySelect Component
+
+### Task 1: Add direct dependencies for the custom picker
 
 **Files:**
 - Modify: `go.mod`
 - Modify: `go.sum`
 
-- [ ] **Step 1: Add the fuzzy dependency**
+- [ ] **Step 1: Add the required direct dependencies**
 
 Run:
 ```bash
-cd /home/claude/projects/wt && go get github.com/sahilm/fuzzy@latest
+go get github.com/sahilm/fuzzy@latest github.com/charmbracelet/bubbletea@v1.1.0 github.com/charmbracelet/bubbles@v0.20.0 github.com/charmbracelet/lipgloss@v0.13.0
 ```
 
-Expected: `go: added github.com/sahilm/fuzzy vX.Y.Z`
+Expected: `go.mod` gains direct `require` entries for the four packages.
 
-- [ ] **Step 2: Verify the dependency was added**
-
-Run:
-```bash
-grep "sahilm/fuzzy" go.mod
-```
-
-Expected: Line showing `github.com/sahilm/fuzzy` with version
-
-- [ ] **Step 3: Tidy modules**
+- [ ] **Step 2: Tidy the module graph**
 
 Run:
 ```bash
 go mod tidy
 ```
 
-Expected: No output (success)
+Expected: command exits successfully with no error output.
+
+- [ ] **Step 3: Verify the new dependency is present**
+
+Run:
+```bash
+rg -n "sahilm/fuzzy|bubbletea|bubbles|lipgloss" go.mod
+```
+
+Expected: output shows all four packages in direct dependencies.
 
 - [ ] **Step 4: Commit the dependency change**
 
 ```bash
 git add go.mod go.sum
-git commit -m "deps: add sahilm/fuzzy for fuzzy matching in picker"
+git commit -m "deps: add dependencies for fuzzy picker"
 ```
 
----
-
-### Task 2: Create FuzzySelect Types and Constructor
+### Task 2: Create the FuzzySelect type and filtering helpers with tests first
 
 **Files:**
 - Create: `internal/picker/fuzzy_select.go`
+- Create: `internal/picker/fuzzy_select_test.go`
 
-- [ ] **Step 1: Write the failing test for FuzzyItem and constructor**
+- [ ] **Step 1: Write failing tests for constructor state and filter behavior**
 
-Create `internal/picker/fuzzy_select_test.go`:
+Create `internal/picker/fuzzy_select_test.go` with:
 
 ```go
 package picker
@@ -83,54 +89,103 @@ import (
 	"testing"
 )
 
-func TestFuzzyItem(t *testing.T) {
-	item := FuzzyItem{Label: "feat/auth", Value: "feat/auth"}
-	if item.Label != "feat/auth" {
-		t.Errorf("Label = %q, want %q", item.Label, "feat/auth")
-	}
-	if item.Value != "feat/auth" {
-		t.Errorf("Value = %q, want %q", item.Value, "feat/auth")
-	}
-}
-
-func TestNewFuzzySelect(t *testing.T) {
+func TestNewFuzzySelect_InitialState(t *testing.T) {
 	items := []FuzzyItem{
 		{Label: "main", Value: "main"},
 		{Label: "develop", Value: "develop"},
 	}
 	pinned := []FuzzyItem{
-		{Label: "Create new branch", Value: "__new__"},
+		{Label: "Create new branch", Value: newBranchOption},
 	}
 
 	model := NewFuzzySelect("Select branch:", items, pinned)
-	if model == nil {
-		t.Fatal("NewFuzzySelect returned nil")
-	}
 
-	// Verify internal state via Init (should be non-nil tea.Model)
-	cmd := model.Init()
-	if cmd != nil {
-		t.Error("Init() should return nil for this component")
+	if model.title != "Select branch:" {
+		t.Fatalf("title = %q, want %q", model.title, "Select branch:")
+	}
+	if len(model.items) != 2 {
+		t.Fatalf("len(items) = %d, want 2", len(model.items))
+	}
+	if len(model.pinned) != 1 {
+		t.Fatalf("len(pinned) = %d, want 1", len(model.pinned))
+	}
+	if model.cursor != 0 {
+		t.Fatalf("cursor = %d, want 0", model.cursor)
+	}
+	if got := len(model.visibleItems()); got != 2 {
+		t.Fatalf("visibleItems() len = %d, want 2", got)
+	}
+}
+
+func TestFuzzySelect_VisibleItems_EmptyQueryPreservesOrder(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+		{Label: "develop", Value: "develop"},
+		{Label: "feat/auth", Value: "feat/auth"},
+	}, nil)
+
+	model.textInput.SetValue("")
+	model.refreshMatches()
+
+	got := model.visibleItems()
+	if len(got) != 3 {
+		t.Fatalf("len(visibleItems) = %d, want 3", len(got))
+	}
+	if got[0].Value != "main" || got[1].Value != "develop" || got[2].Value != "feat/auth" {
+		t.Fatalf("visibleItems order = %#v", got)
+	}
+}
+
+func TestFuzzySelect_VisibleItems_FuzzyMatchesQuery(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "feat/oauth-provider", Value: "feat/oauth-provider"},
+		{Label: "feat/auth-api", Value: "feat/auth-api"},
+		{Label: "bugfix/auth-token-refresh", Value: "bugfix/auth-token-refresh"},
+	}, nil)
+
+	model.textInput.SetValue("auth")
+	model.refreshMatches()
+
+	got := model.visibleItems()
+	if len(got) == 0 {
+		t.Fatal("visibleItems() returned no matches")
+	}
+	if got[0].Value != "feat/auth-api" {
+		t.Fatalf("top match = %q, want %q", got[0].Value, "feat/auth-api")
+	}
+}
+
+func TestFuzzySelect_VisibleItems_NoMatches(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+		{Label: "develop", Value: "develop"},
+	}, nil)
+
+	model.textInput.SetValue("zzzzz")
+	model.refreshMatches()
+
+	if got := len(model.visibleItems()); got != 0 {
+		t.Fatalf("len(visibleItems) = %d, want 0", got)
 	}
 }
 ```
 
 Run:
 ```bash
-go test ./internal/picker -run "TestFuzzyItem|TestNewFuzzySelect" -v
+go test ./internal/picker -run "TestNewFuzzySelect_InitialState|TestFuzzySelect_VisibleItems" -v
 ```
 
-Expected: FAIL — `undefined: FuzzyItem`, `undefined: NewFuzzySelect`
+Expected: FAIL with `undefined: FuzzyItem`, `undefined: NewFuzzySelect`, and related missing methods.
 
-- [ ] **Step 2: Write minimal implementation**
+- [ ] **Step 2: Implement the minimal type, constructor, and filter helpers**
 
-Create `internal/picker/fuzzy_select.go`:
+Create `internal/picker/fuzzy_select.go` with:
 
 ```go
-// Package picker provides interactive TUI selection for wt commands.
 package picker
 
 import (
+	"context"
 	"errors"
 	"os"
 	"sort"
@@ -138,661 +193,106 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/sahilm/fuzzy"
 	"golang.org/x/term"
 )
 
-// ErrCancelled is returned when the user cancels selection (Esc/Ctrl+C).
-// Callers can check for this to distinguish cancellation from other errors.
 var ErrCancelled = errors.New("selection cancelled")
 
-// FuzzyItem represents a single selectable item.
 type FuzzyItem struct {
-	Label string // display text (also used for fuzzy matching)
-	Value string // return value (opaque to the component)
+	Label string
+	Value string
 }
 
-// FuzzySelect is a bubbletea model for fuzzy selection with a pinned text input.
 type FuzzySelect struct {
 	title     string
 	items     []FuzzyItem
 	pinned    []FuzzyItem
-	filtered  []fuzzy.Match
+	matches   []fuzzy.Match
 	textInput textinput.Model
-	cursor    int
 	viewport  viewport.Model
+	cursor    int
 	height    int
 	chosen    *FuzzyItem
 	cancelled bool
 }
 
-// NewFuzzySelect creates a new FuzzySelect model.
-// items: the list of items to select from (participate in fuzzy matching)
-// pinned: items always displayed at top (do not participate in matching)
 func NewFuzzySelect(title string, items []FuzzyItem, pinned []FuzzyItem) *FuzzySelect {
-	ti := textinput.New()
-	ti.Placeholder = "Type to filter..."
-	ti.Focus()
+	input := textinput.New()
+	input.Placeholder = "Type to filter..."
+	input.Focus()
 
-	// Get terminal height for viewport sizing
-	height := 20 // default fallback
-	if w, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil && h > 3 {
-		height = h - 3 // reserve lines for title, input, and padding
+	height := 20
+	if _, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil && h > 3 {
+		height = h - 3
 	}
-	if w, _, _ := term.GetSize(int(os.Stdout.Fd())); w > 0 {
-		ti.Width = w - 10 // leave room for prompt and padding
-	}
-
-	_ = w // silence unused variable warning
 
 	model := &FuzzySelect{
 		title:     title,
-		items:     items,
-		pinned:    pinned,
-		textInput: ti,
+		items:     append([]FuzzyItem(nil), items...),
+		pinned:    append([]FuzzyItem(nil), pinned...),
+		textInput: input,
 		height:    height,
 	}
-
-	// Initial filter with empty input shows all items
-	model.updateFilter()
-	model.updateViewport()
-
+	model.refreshMatches()
 	return model
 }
 
-// Init implements tea.Model.
 func (m *FuzzySelect) Init() tea.Cmd {
 	return nil
 }
 
-// updateFilter rebuilds the filtered list based on current input.
-func (m *FuzzySelect) updateFilter() {
-	input := m.textInput.Value()
-	if input == "" {
-		// Empty input: show all items in original order (no fuzzy matching)
-		m.filtered = nil
+func (m *FuzzySelect) refreshMatches() {
+	query := m.textInput.Value()
+	if query == "" {
+		m.matches = nil
 		return
 	}
 
-	// Build slice of labels for fuzzy matching
 	labels := make([]string, len(m.items))
 	for i, item := range m.items {
 		labels[i] = item.Label
 	}
 
-	// Perform fuzzy matching
-	matches := fuzzy.Find(input, labels)
-
-	// Sort by score descending (best matches first)
-	sort.Slice(matches, func(i, j int) bool {
-		return matches[i].Score > matches[j].Score
+	m.matches = fuzzy.Find(query, labels)
+	sort.SliceStable(m.matches, func(i, j int) bool {
+		return m.matches[i].Score > m.matches[j].Score
 	})
-
-	m.filtered = matches
 }
 
-// updateViewport recalculates viewport content and size.
-func (m *FuzzySelect) updateViewport() {
-	// Calculate number of visible items
-	itemCount := len(m.pinned) + len(m.filtered)
-	viewportHeight := min(itemCount, m.height)
-	if viewportHeight < 1 {
-		viewportHeight = 1
+func (m *FuzzySelect) visibleItems() []FuzzyItem {
+	if m.textInput.Value() == "" {
+		return append([]FuzzyItem(nil), m.items...)
 	}
 
-	m.viewport.Height = viewportHeight
-
-	// Build viewport content
-	var content string
-	for i, item := range m.pinned {
-		prefix := "  "
-		if m.cursor == i {
-			prefix = "> "
-		}
-		content += prefix + item.Label + "\n"
+	items := make([]FuzzyItem, 0, len(m.matches))
+	for _, match := range m.matches {
+		items = append(items, m.items[match.Index])
 	}
-
-	for i, match := range m.filtered {
-		prefix := "  "
-		if m.cursor == len(m.pinned)+i {
-			prefix = "> "
-		}
-		content += prefix + m.renderMatch(match) + "\n"
-	}
-
-	m.viewport.SetContent(content)
+	return items
 }
 
-// renderMatch renders a fuzzy match with highlighted characters.
-func (m *FuzzySelect) renderMatch(match fuzzy.Match) string {
-	label := m.items[match.MatchedIndex].Label
-
-	// Build string with matched characters highlighted
-	result := make([]rune, 0, len(label))
-	matchedSet := make(map[int]bool)
-	for _, idx := range match.MatchedIndexes {
-		matchedSet[idx] = true
+func (m *FuzzySelect) selectedItem() *FuzzyItem {
+	totalPinned := len(m.pinned)
+	if m.cursor < totalPinned {
+		return &m.pinned[m.cursor]
 	}
 
-	highlightStyle := lipgloss.NewStyle().Bold(true).Reverse(true)
-
-	for i, r := range label {
-		if matchedSet[i] {
-			result = append(result, []rune(highlightStyle.Render(string(r)))...)
-		} else {
-			result = append(result, r)
-		}
+	visible := m.visibleItems()
+	index := m.cursor - totalPinned
+	if index < 0 || index >= len(visible) {
+		return nil
 	}
 
-	return string(result)
+	item := visible[index]
+	return &item
 }
 
-// min returns the smaller of a and b.
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+func (m *FuzzySelect) totalOptions() int {
+	return len(m.pinned) + len(m.visibleItems())
 }
 
-// Ensure FuzzySelect implements tea.Model at compile time.
-var _ tea.Model = (*FuzzySelect)(nil)
-```
-
-Note: We declare `w` with underscore assignment to avoid unused variable errors while keeping the width calculation available for future use.
-
-Run:
-```bash
-go test ./internal/picker -run "TestFuzzyItem|TestNewFuzzySelect" -v
-```
-
-Expected: PASS
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add internal/picker/fuzzy_select.go internal/picker/fuzzy_select_test.go
-git commit -m "feat(picker): add FuzzySelect types and constructor"
-```
-
----
-
-### Task 3: Implement Update Method
-
-**Files:**
-- Modify: `internal/picker/fuzzy_select.go`
-- Modify: `internal/picker/fuzzy_select_test.go`
-
-- [ ] **Step 1: Write the failing test for navigation and filtering**
-
-Add to `internal/picker/fuzzy_select_test.go`:
-
-```go
-func TestFuzzySelect_Update_Navigation(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
-		{Label: "feat/auth", Value: "feat/auth"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Initial cursor should be 0
-	if model.cursor != 0 {
-		t.Errorf("initial cursor = %d, want 0", model.cursor)
-	}
-
-	// Move down
-	updatedModel, _ := model.Update(keyMsg("down"))
-	model = updatedModel.(*FuzzySelect)
-	if model.cursor != 1 {
-		t.Errorf("after down: cursor = %d, want 1", model.cursor)
-	}
-
-	// Move up (should stay at 0 due to bounds)
-	updatedModel, _ = model.Update(keyMsg("up"))
-	model = updatedModel.(*FuzzySelect)
-	if model.cursor != 0 {
-		t.Errorf("after up at top: cursor = %d, want 0", model.cursor)
-	}
-}
-
-func TestFuzzySelect_Update_EnterSelects(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Press Enter to select first item
-	updatedModel, cmd := model.Update(keyMsg("enter"))
-	model = updatedModel.(*FuzzySelect)
-
-	if model.chosen == nil {
-		t.Error("Enter should set chosen item")
-	}
-	if model.chosen.Value != "main" {
-		t.Errorf("chosen.Value = %q, want %q", model.chosen.Value, "main")
-	}
-
-	// Should return tea.Quit to exit the program
-	if cmd == nil {
-		t.Error("Enter should return tea.Quit command")
-	}
-}
-
-func TestFuzzySelect_Update_EscCancels(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Press Esc to cancel
-	updatedModel, _ := model.Update(keyMsg("esc"))
-	model = updatedModel.(*FuzzySelect)
-
-	if !model.cancelled {
-		t.Error("Esc should set cancelled flag")
-	}
-}
-
-func TestFuzzySelect_Update_TextInputFilters(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
-		{Label: "feat/auth", Value: "feat/auth"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Type "auth"
-	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	model = updatedModel.(*FuzzySelect)
-	updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
-	model = updatedModel.(*FuzzySelect)
-	updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
-	model = updatedModel.(*FuzzySelect)
-	updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
-	model = updatedModel.(*FuzzySelect)
-
-	// Check that filtering occurred
-	if len(model.filtered) == 0 {
-		t.Error("typing 'auth' should filter to at least one item")
-	}
-
-	// Verify "feat/auth" is in results
-	found := false
-	for _, match := range model.filtered {
-		if model.items[match.MatchedIndex].Label == "feat/auth" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("'feat/auth' should be in filtered results for 'auth'")
-	}
-}
-
-// keyMsg is a helper to create tea.KeyMsg for testing.
-func keyMsg(key string) tea.KeyMsg {
-	switch key {
-	case "up":
-		return tea.KeyMsg{Type: tea.KeyUp}
-	case "down":
-		return tea.KeyMsg{Type: tea.KeyDown}
-	case "enter":
-		return tea.KeyMsg{Type: tea.KeyEnter}
-	case "esc":
-		return tea.KeyMsg{Type: tea.KeyEscape}
-	case "ctrl+c":
-		return tea.KeyMsg{Type: tea.KeyCtrlC}
-	default:
-		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
-	}
-}
-```
-
-Run:
-```bash
-go test ./internal/picker -run "TestFuzzySelect_Update" -v
-```
-
-Expected: FAIL — Update method doesn't exist or doesn't work
-
-- [ ] **Step 2: Implement Update method**
-
-Add to `internal/picker/fuzzy_select.go` after `Init()`:
-
-```go
-import (
-	"strings"
-)
-
-// Update implements tea.Model.
-func (m *FuzzySelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyUp, tea.KeyCtrlP, tea.KeyCtrlK:
-			// Move cursor up
-			totalItems := len(m.pinned) + len(m.filtered)
-			if m.cursor > 0 {
-				m.cursor--
-			}
-			m.updateViewport()
-			return m, nil
-
-		case tea.KeyDown, tea.KeyCtrlN, tea.KeyCtrlJ:
-			// Move cursor down
-			totalItems := len(m.pinned) + len(m.filtered)
-			if m.cursor < totalItems-1 {
-				m.cursor++
-			}
-			m.updateViewport()
-			return m, nil
-
-		case tea.KeyEnter:
-			// Select current item
-			totalItems := len(m.pinned) + len(m.filtered)
-			if totalItems == 0 {
-				return m, tea.Quit
-			}
-			if m.cursor < len(m.pinned) {
-				m.chosen = &m.pinned[m.cursor]
-			} else if m.cursor < totalItems {
-				matchIdx := m.cursor - len(m.pinned)
-				m.chosen = &m.items[m.filtered[matchIdx].MatchedIndex]
-			}
-			return m, tea.Quit
-
-		case tea.KeyEscape, tea.KeyCtrlC:
-			// Cancel selection
-			m.cancelled = true
-			return m, tea.Quit
-
-		case tea.KeyRunes:
-			// Pass to text input
-			var cmd tea.Cmd
-			m.textInput, cmd = m.textInput.Update(msg)
-			m.updateFilter()
-			m.cursor = 0 // Reset cursor when filter changes
-			m.updateViewport()
-			return m, cmd
-
-		case tea.KeyBackspace, tea.KeyDelete:
-			// Pass to text input
-			var cmd tea.Cmd
-			m.textInput, cmd = m.textInput.Update(msg)
-			m.updateFilter()
-			m.cursor = 0
-			m.updateViewport()
-			return m, cmd
-		}
-
-	case tea.WindowSizeMsg:
-		// Handle terminal resize
-		m.height = msg.Height - 3
-		if m.height < 1 {
-			m.height = 1
-		}
-		m.textInput.Width = msg.Width - 10
-		if m.textInput.Width < 10 {
-			m.textInput.Width = 10
-		}
-		m.updateViewport()
-		return m, nil
-	}
-
-	return m, nil
-}
-```
-
-Also add the import for strings at the top (for potential future use):
-```go
-import (
-	"errors"
-	"os"
-	"sort"
-	"strings" // add this
-)
-```
-
-Run:
-```bash
-go test ./internal/picker -run "TestFuzzySelect_Update" -v
-```
-
-Expected: PASS
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add internal/picker/fuzzy_select.go internal/picker/fuzzy_select_test.go
-git commit -m "feat(picker): implement FuzzySelect Update method with navigation and filtering"
-```
-
----
-
-### Task 4: Implement View Method and Run Function
-
-**Files:**
-- Modify: `internal/picker/fuzzy_select.go`
-- Modify: `internal/picker/fuzzy_select_test.go`
-
-- [ ] **Step 1: Write the failing test for View**
-
-Add to `internal/picker/fuzzy_select_test.go`:
-
-```go
-func TestFuzzySelect_View(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
-	}
-	model := NewFuzzySelect("Select branch:", items, nil).(*FuzzySelect)
-
-	view := model.View()
-
-	// View should contain title
-	if !strings.Contains(view, "Select branch:") {
-		t.Error("View should contain title")
-	}
-
-	// View should contain match count (2/2 for empty filter)
-	if !strings.Contains(view, "2/") {
-		t.Error("View should show match count")
-	}
-
-	// View should contain the items
-	if !strings.Contains(view, "main") {
-		t.Error("View should contain 'main'")
-	}
-}
-
-func TestFuzzySelect_View_WithPinned(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-	}
-	pinned := []FuzzyItem{
-		{Label: "Create new branch", Value: "__new__"},
-	}
-	model := NewFuzzySelect("Select:", items, pinned).(*FuzzySelect)
-
-	view := model.View()
-
-	// Pinned item should be visible
-	if !strings.Contains(view, "Create new branch") {
-		t.Error("View should contain pinned item")
-	}
-
-	// Regular item should also be visible
-	if !strings.Contains(view, "main") {
-		t.Error("View should contain regular item")
-	}
-}
-```
-
-Also add the strings import to the test file:
-```go
-import (
-	"strings"
-	"testing"
-)
-```
-
-Run:
-```bash
-go test ./internal/picker -run "TestFuzzySelect_View" -v
-```
-
-Expected: FAIL — View method doesn't exist
-
-- [ ] **Step 2: Implement View method**
-
-Add to `internal/picker/fuzzy_select.go`:
-
-```go
-// View implements tea.Model.
-func (m *FuzzySelect) View() string {
-	var b strings.Builder
-
-	// Calculate match count (excludes pinned items)
-	matchCount := len(m.filtered)
-	totalCount := len(m.items)
-
-	// Title with match count
-	titleStyle := lipgloss.NewStyle().Bold(true)
-	b.WriteString(titleStyle.Render(m.title))
-	b.WriteString(fmt.Sprintf("              %d/%d\n", matchCount, totalCount))
-
-	// Text input (always visible)
-	b.WriteString(m.textInput.View())
-	b.WriteString("\n")
-
-	// List with cursor
-	for i, item := range m.pinned {
-		if m.cursor == i {
-			b.WriteString(lipgloss.NewStyle().Bold(true).Render("> " + item.Label))
-		} else {
-			b.WriteString("  " + item.Label)
-		}
-		b.WriteString("\n")
-	}
-
-	for i, match := range m.filtered {
-		idx := len(m.pinned) + i
-		if m.cursor == idx {
-			b.WriteString(lipgloss.NewStyle().Bold(true).Render("> " + m.renderMatch(match)))
-		} else {
-			b.WriteString("  " + m.renderMatch(match))
-		}
-		b.WriteString("\n")
-	}
-
-	return b.String()
-}
-```
-
-Also add `fmt` to the imports:
-```go
-import (
-	"errors"
-	"fmt"
-	"os"
-	"sort"
-	"strings"
-)
-```
-
-Run:
-```bash
-go test ./internal/picker -run "TestFuzzySelect_View" -v
-```
-
-Expected: PASS
-
-- [ ] **Step 3: Write test for Run function**
-
-Add to `internal/picker/fuzzy_select_test.go`:
-
-```go
-func TestFuzzySelect_Run_Cancelled(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-	}
-	model := NewFuzzySelect("Select:", items, nil)
-	model.cancelled = true
-
-	result, err := model.Run(context.Background())
-	if err != ErrCancelled {
-		t.Errorf("Run with cancelled=true should return ErrCancelled, got %v", err)
-	}
-	if result != nil {
-		t.Error("Run with cancelled=true should return nil result")
-	}
-}
-
-func TestFuzzySelect_Run_Chosen(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-	model.chosen = &items[0]
-
-	result, err := model.Run(context.Background())
-	if err != nil {
-		t.Errorf("Run with chosen set should not error, got %v", err)
-	}
-	if result == nil {
-		t.Fatal("Run with chosen set should return result")
-	}
-	if result.Value != "main" {
-		t.Errorf("result.Value = %q, want %q", result.Value, "main")
-	}
-}
-```
-
-Add `context` import to test file:
-```go
-import (
-	"context"
-	"strings"
-	"testing"
-)
-```
-
-Run:
-```bash
-go test ./internal/picker -run "TestFuzzySelect_Run" -v
-```
-
-Expected: FAIL — Run method doesn't exist
-
-- [ ] **Step 4: Implement Run method**
-
-Add to `internal/picker/fuzzy_select.go`:
-
-```go
-import (
-	"context"
-	"errors"
-	"fmt"
-	"os"
-	"sort"
-	"strings"
-
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/sahilm/fuzzy"
-	"golang.org/x/term"
-)
-
-// Run executes the FuzzySelect and returns the selected item.
-// Returns ErrCancelled if the user presses Esc or Ctrl+C.
 func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
-	// If already cancelled or chosen (for testing), return immediately
 	if m.cancelled {
 		return nil, ErrCancelled
 	}
@@ -800,188 +300,528 @@ func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
 		return m.chosen, nil
 	}
 
-	// Run the bubbletea program with context for cancellation
 	program := tea.NewProgram(m, tea.WithContext(ctx))
 	finalModel, err := program.Run()
 	if err != nil {
-		return nil, fmt.Errorf("run picker: %w", err)
+		return nil, err
 	}
 
-	model := finalModel.(*FuzzySelect)
-
-	if model.cancelled {
+	result := finalModel.(*FuzzySelect)
+	if result.cancelled {
 		return nil, ErrCancelled
 	}
-
-	if model.chosen == nil {
-		return nil, errors.New("no selection made")
+	if result.chosen == nil {
+		return nil, nil
 	}
-
-	return model.chosen, nil
+	return result.chosen, nil
 }
 ```
 
 Run:
 ```bash
-go test ./internal/picker -run "TestFuzzySelect_Run" -v
+go test ./internal/picker -run "TestNewFuzzySelect_InitialState|TestFuzzySelect_VisibleItems" -v
 ```
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit the component skeleton**
 
 ```bash
 git add internal/picker/fuzzy_select.go internal/picker/fuzzy_select_test.go
-git commit -m "feat(picker): implement FuzzySelect View and Run methods"
+git commit -m "feat(picker): add fuzzy select model skeleton"
 ```
 
----
-
-### Task 5: Fuzzy Ranking Tests
+### Task 3: Implement navigation, cancellation, rendering, and viewport behavior
 
 **Files:**
+- Modify: `internal/picker/fuzzy_select.go`
 - Modify: `internal/picker/fuzzy_select_test.go`
 
-- [ ] **Step 1: Write tests for fuzzy ranking behavior**
+- [ ] **Step 1: Add failing tests for update, view, and cancellation behavior**
 
-Add to `internal/picker/fuzzy_select_test.go`:
+Append to `internal/picker/fuzzy_select_test.go`:
 
 ```go
-func TestFuzzySelect_Ranking(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "feat/oauth-provider", Value: "feat/oauth-provider"},
-		{Label: "feat/auth-api", Value: "feat/auth-api"},
-		{Label: "bugfix/auth-token-refresh", Value: "bugfix/auth-token-refresh"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
+package picker
 
-	// Type "auth"
+import (
+	"context"
+	"strings"
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+func TestFuzzySelect_Update_MovesCursorWithinBounds(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+		{Label: "develop", Value: "develop"},
+	}, nil)
+
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated := next.(*FuzzySelect)
+	if updated.cursor != 1 {
+		t.Fatalf("cursor after down = %d, want 1", updated.cursor)
+	}
+
+	next, _ = updated.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated = next.(*FuzzySelect)
+	if updated.cursor != 1 {
+		t.Fatalf("cursor after second down = %d, want 1", updated.cursor)
+	}
+
+	next, _ = updated.Update(tea.KeyMsg{Type: tea.KeyUp})
+	updated = next.(*FuzzySelect)
+	if updated.cursor != 0 {
+		t.Fatalf("cursor after up = %d, want 0", updated.cursor)
+	}
+}
+
+func TestFuzzySelect_Update_EnterChoosesPinnedOrVisibleItem(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+	}, []FuzzyItem{
+		{Label: "Create new branch", Value: newBranchOption},
+	})
+
+	next, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated := next.(*FuzzySelect)
+	if updated.chosen == nil {
+		t.Fatal("chosen = nil, want selected pinned item")
+	}
+	if updated.chosen.Value != newBranchOption {
+		t.Fatalf("chosen.Value = %q, want %q", updated.chosen.Value, newBranchOption)
+	}
+	if cmd == nil {
+		t.Fatal("cmd = nil, want quit command")
+	}
+}
+
+func TestFuzzySelect_Update_EscapeCancels(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+	}, nil)
+
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	updated := next.(*FuzzySelect)
+	if !updated.cancelled {
+		t.Fatal("cancelled = false, want true")
+	}
+}
+
+func TestFuzzySelect_Update_TextEntryRefreshesMatchesAndResetsCursor(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+		{Label: "feat/auth", Value: "feat/auth"},
+	}, nil)
+	model.cursor = 1
+
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	updated := next.(*FuzzySelect)
+
+	if updated.cursor != 0 {
+		t.Fatalf("cursor = %d, want 0", updated.cursor)
+	}
+	if got := len(updated.visibleItems()); got == 0 {
+		t.Fatal("visibleItems() returned 0 matches after typing")
+	}
+}
+
+func TestFuzzySelect_View_ShowsTitleCountInputAndPinnedItem(t *testing.T) {
+	model := NewFuzzySelect("Select branch:", []FuzzyItem{
+		{Label: "main", Value: "main"},
+		{Label: "feat/auth", Value: "feat/auth"},
+	}, []FuzzyItem{
+		{Label: "Create new branch", Value: newBranchOption},
+	})
 	model.textInput.SetValue("auth")
-	model.updateFilter()
+	model.refreshMatches()
 
-	// Verify we have matches
-	if len(model.filtered) == 0 {
-		t.Fatal("'auth' should match at least one item")
-	}
-
-	// Verify feat/auth-api is in results (contains "auth" directly)
-	found := false
-	for _, match := range model.filtered {
-		if model.items[match.MatchedIndex].Label == "feat/auth-api" {
-			found = true
-			break
+	view := model.View()
+	for _, want := range []string{"Select branch:", "1/2", "auth", "Create new branch", "feat/auth"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("View() missing %q in %q", want, view)
 		}
 	}
-	if !found {
-		t.Error("'feat/auth-api' should be in filtered results for 'auth'")
-	}
 }
 
-func TestFuzzySelect_EmptyInputShowsAll(t *testing.T) {
-	items := []FuzzyItem{
+func TestFuzzySelect_Run_ShortCircuitsChosenAndCancelled(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
 		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
-		{Label: "feat/auth", Value: "feat/auth"},
+	}, nil)
+	model.chosen = &FuzzyItem{Label: "main", Value: "main"}
+
+	item, err := model.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
 	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Empty input means filtered is nil (show all in View)
-	model.textInput.SetValue("")
-	model.updateFilter()
-
-	if model.filtered != nil {
-		t.Error("empty input should result in nil filtered (show all)")
+	if item == nil || item.Value != "main" {
+		t.Fatalf("Run() item = %#v, want main", item)
 	}
-}
 
-func TestFuzzySelect_NoMatches(t *testing.T) {
-	items := []FuzzyItem{
+	cancelled := NewFuzzySelect("Select:", []FuzzyItem{
 		{Label: "main", Value: "main"},
-		{Label: "develop", Value: "develop"},
+	}, nil)
+	cancelled.cancelled = true
+
+	item, err = cancelled.Run(context.Background())
+	if !errors.Is(err, ErrCancelled) {
+		t.Fatalf("Run() err = %v, want ErrCancelled", err)
 	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Type something that won't match
-	model.textInput.SetValue("zzzzz")
-	model.updateFilter()
-
-	if len(model.filtered) != 0 {
-		t.Errorf("no matches expected, got %d", len(model.filtered))
-	}
-}
-
-func TestFuzzySelect_SpecialCharacters(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "fix/issue#123", Value: "fix/issue#123"},
-		{Label: "feat/api-v2", Value: "feat/api-v2"},
-	}
-	model := NewFuzzySelect("Select:", items, nil).(*FuzzySelect)
-
-	// Type "issue"
-	model.textInput.SetValue("issue")
-	model.updateFilter()
-
-	if len(model.filtered) == 0 {
-		t.Error("'issue' should match 'fix/issue#123'")
+	if item != nil {
+		t.Fatalf("Run() item = %#v, want nil", item)
 	}
 }
+```
 
-func TestFuzzySelect_MatchCountAccuracy(t *testing.T) {
-	items := []FuzzyItem{
-		{Label: "feat/auth", Value: "feat/auth"},
-		{Label: "feat/oauth", Value: "feat/oauth"},
-		{Label: "main", Value: "main"},
-	}
-	pinned := []FuzzyItem{
-		{Label: "Create new", Value: "__new__"},
-	}
-	model := NewFuzzySelect("Select:", items, pinned).(*FuzzySelect)
+Then fix the imports at the top of `internal/picker/fuzzy_select_test.go` to:
 
-	// Type "auth"
-	model.textInput.SetValue("auth")
-	model.updateFilter()
+```go
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
 
-	// Count should be 2 (auth matches), not 3 (excludes pinned)
-	matchCount := len(model.filtered)
-	if matchCount != 2 {
-		t.Errorf("match count = %d, want 2", matchCount)
-	}
-}
+	tea "github.com/charmbracelet/bubbletea"
+)
 ```
 
 Run:
 ```bash
-go test ./internal/picker -run "TestFuzzySelect_Ranking|TestFuzzySelect_Empty|TestFuzzySelect_NoMatches|TestFuzzySelect_Special|TestFuzzySelect_MatchCount" -v
+go test ./internal/picker -run "TestFuzzySelect_Update|TestFuzzySelect_View|TestFuzzySelect_Run" -v
+```
+
+Expected: FAIL because `Update` and `View` are not implemented yet.
+
+- [ ] **Step 2: Implement `Update`, viewport syncing, and `View`**
+
+Update `internal/picker/fuzzy_select.go` to:
+
+```go
+package picker
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/sahilm/fuzzy"
+	"golang.org/x/term"
+)
+
+var (
+	selectedStyle = lipgloss.NewStyle().Bold(true).Reverse(true)
+	matchStyle    = lipgloss.NewStyle().Bold(true)
+)
+
+func (m *FuzzySelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height - 3
+		if m.height < 1 {
+			m.height = 1
+		}
+		m.viewport.Width = msg.Width
+		m.viewport.Height = min(m.height, max(1, m.totalOptions()))
+		m.syncViewport()
+		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEscape:
+			m.cancelled = true
+			return m, tea.Quit
+		case tea.KeyUp, tea.KeyCtrlP, tea.KeyCtrlK:
+			if m.cursor > 0 {
+				m.cursor--
+			}
+			m.syncViewport()
+			return m, nil
+		case tea.KeyDown, tea.KeyCtrlN, tea.KeyCtrlJ:
+			if m.cursor < m.totalOptions()-1 {
+				m.cursor++
+			}
+			m.syncViewport()
+			return m, nil
+		case tea.KeyEnter:
+			m.chosen = m.selectedItem()
+			return m, tea.Quit
+		}
+
+		var cmd tea.Cmd
+		m.textInput, cmd = m.textInput.Update(msg)
+		m.refreshMatches()
+		if m.cursor >= m.totalOptions() {
+			m.cursor = max(0, m.totalOptions()-1)
+		} else {
+			m.cursor = 0
+		}
+		m.syncViewport()
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+func (m *FuzzySelect) View() string {
+	var b strings.Builder
+
+	title := fmt.Sprintf("%s  %d/%d", m.title, len(m.visibleItems()), len(m.items))
+	b.WriteString(title)
+	b.WriteByte('\n')
+	b.WriteString(m.textInput.View())
+	b.WriteByte('\n')
+	b.WriteString(m.viewport.View())
+
+	return b.String()
+}
+
+func (m *FuzzySelect) syncViewport() {
+	visible := m.visibleItems()
+	lines := make([]string, 0, len(m.pinned)+len(visible))
+
+	for i, item := range m.pinned {
+		line := "  " + item.Label
+		if m.cursor == i {
+			line = selectedStyle.Render("> " + item.Label)
+		}
+		lines = append(lines, line)
+	}
+
+	for i, item := range visible {
+		cursorIndex := len(m.pinned) + i
+		label := m.renderLabel(item)
+		line := "  " + label
+		if m.cursor == cursorIndex {
+			line = selectedStyle.Render("> " + label)
+		}
+		lines = append(lines, line)
+	}
+
+	if m.viewport.Height == 0 {
+		m.viewport.Height = min(m.height, max(1, len(lines)))
+	}
+	m.viewport.SetContent(strings.Join(lines, "\n"))
+}
+
+func (m *FuzzySelect) renderLabel(item FuzzyItem) string {
+	query := m.textInput.Value()
+	if query == "" {
+		return item.Label
+	}
+
+	matches := fuzzy.Find(query, []string{item.Label})
+	if len(matches) == 0 {
+		return item.Label
+	}
+
+	matched := map[int]struct{}{}
+	for _, idx := range matches[0].MatchedIndexes {
+		matched[idx] = struct{}{}
+	}
+
+	var b strings.Builder
+	for i, r := range item.Label {
+		if _, ok := matched[i]; ok {
+			b.WriteString(matchStyle.Render(string(r)))
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+```
+
+Important cleanup while implementing:
+
+- In `NewFuzzySelect`, initialize `model.viewport = viewport.New(0, min(height, max(1, len(items)+len(pinned))))`.
+- Call `model.syncViewport()` before returning from `NewFuzzySelect`.
+- In `Run`, wrap Bubble Tea failures as `fmt.Errorf("run fuzzy select: %w", err)`.
+- Keep `ErrCancelled` untouched as the cancellation sentinel.
+
+Run:
+```bash
+go test ./internal/picker -run "TestFuzzySelect_" -v
 ```
 
 Expected: PASS
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 3: Commit the finished component**
 
 ```bash
-git add internal/picker/fuzzy_select_test.go
-git commit -m "test(picker): add fuzzy ranking and edge case tests"
+git add internal/picker/fuzzy_select.go internal/picker/fuzzy_select_test.go
+git commit -m "feat(picker): implement fuzzy select behavior"
 ```
 
----
+## Chunk 2: Integrate FuzzySelect into Picker and Verify End-to-End Wiring
 
-## Chunk 2: Integrate FuzzySelect into Picker
-
-### Task 6: Refactor SelectWorktree to use FuzzySelect
+### Task 4: Add a test seam for picker integration and cover non-interactive selection flows
 
 **Files:**
 - Modify: `internal/picker/picker.go`
 - Modify: `internal/picker/picker_test.go`
 
-- [ ] **Step 1: Update SelectWorktree implementation**
+- [ ] **Step 1: Write failing picker integration tests**
 
-Modify `internal/picker/picker.go`:
-
-Replace the `SelectWorktree` method:
+Update `internal/picker/picker_test.go` to:
 
 ```go
-// SelectWorktree presents a picker for selecting a worktree to remove.
-// Returns the selected worktree path, or an error if selection fails.
+package picker
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/joebalancio/wt/pkg/domain"
+)
+
+func withStubbedFuzzyRunner(t *testing.T, stub func(context.Context, string, []FuzzyItem, []FuzzyItem) (*FuzzyItem, error)) {
+	t.Helper()
+	previous := runFuzzySelect
+	runFuzzySelect = stub
+	t.Cleanup(func() {
+		runFuzzySelect = previous
+	})
+}
+
+func TestPicker_SelectWorktree_UsesFuzzySelect(t *testing.T) {
+	mock := &mockBranchLister{
+		listWorktreesFunc: func(_ context.Context) ([]*domain.Worktree, error) {
+			return []*domain.Worktree{
+				{Path: "/repo", Branch: ""},
+				{Path: "/repo/.worktrees/auth", Branch: "feat/auth"},
+			}, nil
+		},
+	}
+	picker := NewPicker(mock)
+
+	withStubbedFuzzyRunner(t, func(_ context.Context, title string, items []FuzzyItem, pinned []FuzzyItem) (*FuzzyItem, error) {
+		if title != "Select worktree to remove:" {
+			t.Fatalf("title = %q, want %q", title, "Select worktree to remove:")
+		}
+		if len(pinned) != 0 {
+			t.Fatalf("len(pinned) = %d, want 0", len(pinned))
+		}
+		if len(items) != 1 {
+			t.Fatalf("len(items) = %d, want 1", len(items))
+		}
+		if items[0].Label != "feat/auth -> /repo/.worktrees/auth" {
+			t.Fatalf("item label = %q", items[0].Label)
+		}
+		return &FuzzyItem{Label: items[0].Label, Value: items[0].Value}, nil
+	})
+
+	got, err := picker.SelectWorktree(context.Background())
+	if err != nil {
+		t.Fatalf("SelectWorktree() error = %v", err)
+	}
+	if got != "/repo/.worktrees/auth" {
+		t.Fatalf("SelectWorktree() = %q, want %q", got, "/repo/.worktrees/auth")
+	}
+}
+
+func TestPicker_SelectBranch_ReturnsExistingBranchFromFuzzySelect(t *testing.T) {
+	mock := &mockBranchLister{
+		listAllBranchesFunc: func(_ context.Context) ([]string, error) {
+			return []string{"main", "develop"}, nil
+		},
+	}
+	picker := NewPicker(mock)
+
+	withStubbedFuzzyRunner(t, func(_ context.Context, title string, items []FuzzyItem, pinned []FuzzyItem) (*FuzzyItem, error) {
+		if title != "Select or create a branch:" {
+			t.Fatalf("title = %q, want %q", title, "Select or create a branch:")
+		}
+		if len(pinned) != 1 || pinned[0].Value != newBranchOption {
+			t.Fatalf("pinned = %#v, want create-new option", pinned)
+		}
+		if len(items) != 2 {
+			t.Fatalf("len(items) = %d, want 2", len(items))
+		}
+		return &FuzzyItem{Label: "develop", Value: "develop"}, nil
+	})
+
+	got, err := picker.SelectBranch(context.Background())
+	if err != nil {
+		t.Fatalf("SelectBranch() error = %v", err)
+	}
+	if got.Branch != "develop" || got.IsNew {
+		t.Fatalf("SelectBranch() = %#v, want existing branch result", got)
+	}
+}
+
+func TestPicker_SelectBranch_PropagatesCancellation(t *testing.T) {
+	mock := &mockBranchLister{
+		listAllBranchesFunc: func(_ context.Context) ([]string, error) {
+			return []string{"main"}, nil
+		},
+	}
+	picker := NewPicker(mock)
+
+	withStubbedFuzzyRunner(t, func(_ context.Context, _ string, _ []FuzzyItem, _ []FuzzyItem) (*FuzzyItem, error) {
+		return nil, ErrCancelled
+	})
+
+	_, err := picker.SelectBranch(context.Background())
+	if !errors.Is(err, ErrCancelled) {
+		t.Fatalf("err = %v, want ErrCancelled", err)
+	}
+}
+```
+
+Keep the existing error-path tests in the same file.
+
+Run:
+```bash
+go test ./internal/picker -run "TestPicker_Select" -v
+```
+
+Expected: FAIL with `undefined: runFuzzySelect` or because `picker.go` still uses `huh.Select`.
+
+- [ ] **Step 2: Add the minimal runner seam and switch `SelectWorktree` / `SelectBranch`**
+
+Update `internal/picker/picker.go` to:
+
+```go
+package picker
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/charmbracelet/huh"
+	"github.com/joebalancio/wt/internal/git"
+	"golang.org/x/term"
+)
+
+var runFuzzySelect = func(ctx context.Context, title string, items []FuzzyItem, pinned []FuzzyItem) (*FuzzyItem, error) {
+	return NewFuzzySelect(title, items, pinned).Run(ctx)
+}
+
 func (p *Picker) SelectWorktree(ctx context.Context) (string, error) {
 	worktrees, err := p.gitClient.ListWorktrees(ctx)
 	if err != nil {
@@ -992,100 +832,57 @@ func (p *Picker) SelectWorktree(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("no worktrees found")
 	}
 
-	var items []FuzzyItem
+	items := make([]FuzzyItem, 0, len(worktrees))
 	for _, wt := range worktrees {
 		if wt.Branch == "" {
 			continue
 		}
-		label := fmt.Sprintf("%s -> %s", wt.Branch, wt.Path)
-		items = append(items, FuzzyItem{Label: label, Value: wt.Path})
+		items = append(items, FuzzyItem{
+			Label: fmt.Sprintf("%s -> %s", wt.Branch, wt.Path),
+			Value: wt.Path,
+		})
 	}
 
 	if len(items) == 0 {
 		return "", fmt.Errorf("no removable worktrees found")
 	}
 
-	result, err := NewFuzzySelect("Select worktree to remove:", items, nil).Run(ctx)
+	selected, err := runFuzzySelect(ctx, "Select worktree to remove:", items, nil)
 	if err != nil {
 		return "", err
 	}
-
-	return result.Value, nil
+	if selected == nil {
+		return "", nil
+	}
+	return selected.Value, nil
 }
-```
 
-Run:
-```bash
-go build ./...
-```
-
-Expected: Build succeeds
-
-- [ ] **Step 2: Update test for SelectWorktree**
-
-Modify `internal/picker/picker_test.go`. The existing tests for list errors and empty worktrees should still work, but add a test for FuzzySelect integration:
-
-```go
-// Note: Interactive selection tests cannot be fully automated.
-// The existing error handling tests (list errors, empty worktrees) remain valid.
-// FuzzySelect component is tested separately in fuzzy_select_test.go.
-```
-
-Run:
-```bash
-go test ./internal/picker -run "TestPicker_SelectWorktree" -v
-```
-
-Expected: PASS (existing error handling tests)
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add internal/picker/picker.go
-git commit -m "feat(picker): replace huh.Select with FuzzySelect in SelectWorktree"
-```
-
----
-
-### Task 7: Refactor SelectBranch to use FuzzySelect
-
-**Files:**
-- Modify: `internal/picker/picker.go`
-
-- [ ] **Step 1: Update SelectBranch implementation**
-
-Modify `internal/picker/picker.go`:
-
-Replace the `SelectBranch` method:
-
-```go
-// SelectBranch presents a picker for selecting or creating a branch.
 func (p *Picker) SelectBranch(ctx context.Context) (SelectBranchResult, error) {
 	branches, err := p.gitClient.ListAllBranches(ctx)
 	if err != nil {
 		return SelectBranchResult{}, fmt.Errorf("list branches: %w", err)
 	}
 
-	// Pinned item for "Create new branch"
-	pinned := []FuzzyItem{{Label: newBranchOption, Value: newBranchOption}}
-
-	// Regular items for existing branches
 	items := make([]FuzzyItem, len(branches))
 	for i, branch := range branches {
 		items[i] = FuzzyItem{Label: branch, Value: branch}
 	}
 
-	result, err := NewFuzzySelect("Select or create a branch:", items, pinned).Run(ctx)
+	selected, err := runFuzzySelect(ctx, "Select or create a branch:", items, []FuzzyItem{
+		{Label: newBranchOption, Value: newBranchOption},
+	})
 	if err != nil {
 		return SelectBranchResult{}, err
 	}
-
-	if result.Value == newBranchOption {
-		return p.promptNewBranch(branches)
+	if selected == nil {
+		return SelectBranchResult{}, nil
+	}
+	if selected.Value == newBranchOption {
+		return p.promptNewBranch(ctx, branches)
 	}
 
 	return SelectBranchResult{
-		Branch: result.Value,
+		Branch: selected.Value,
 		IsNew:  false,
 	}, nil
 }
@@ -1093,42 +890,77 @@ func (p *Picker) SelectBranch(ctx context.Context) (SelectBranchResult, error) {
 
 Run:
 ```bash
-go build ./...
+go test ./internal/picker -run "TestPicker_Select" -v
 ```
 
-Expected: Build succeeds
+Expected: PASS for `SelectWorktree` and existing-branch `SelectBranch` cases. `promptNewBranch` call will still not compile because its signature has not been updated yet.
 
-- [ ] **Step 2: Verify existing tests still pass**
-
-Run:
-```bash
-go test ./internal/picker -run "TestPicker_SelectBranch" -v
-```
-
-Expected: PASS (existing error handling test)
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit the first picker integration change**
 
 ```bash
-git add internal/picker/picker.go
-git commit -m "feat(picker): replace huh.Select with FuzzySelect in SelectBranch"
+git add internal/picker/picker.go internal/picker/picker_test.go
+git commit -m "feat(picker): use fuzzy select for branch and worktree pickers"
 ```
 
----
-
-### Task 8: Refactor promptNewBranch Base Picker to use FuzzySelect
+### Task 5: Switch the base-branch picker inside `promptNewBranch`
 
 **Files:**
 - Modify: `internal/picker/picker.go`
+- Modify: `internal/picker/picker_test.go`
 
-- [ ] **Step 1: Update promptNewBranch implementation**
+- [ ] **Step 1: Add a failing test for new-branch flow base selection**
 
-Modify `internal/picker/picker.go`:
-
-Replace the `promptNewBranch` method:
+Append to `internal/picker/picker_test.go`:
 
 ```go
-func (p *Picker) promptNewBranch(existingBranches []string) (SelectBranchResult, error) {
+func TestPicker_PromptNewBranch_UsesFuzzySelectForBaseBranch(t *testing.T) {
+	mock := &mockBranchLister{}
+	picker := NewPicker(mock)
+
+	previousInput := runBranchNameInput
+	runBranchNameInput = func(_ []string) (string, error) {
+		return "feat/new-search", nil
+	}
+	t.Cleanup(func() {
+		runBranchNameInput = previousInput
+	})
+
+	withStubbedFuzzyRunner(t, func(_ context.Context, title string, items []FuzzyItem, pinned []FuzzyItem) (*FuzzyItem, error) {
+		if title != "Select base branch:" {
+			t.Fatalf("title = %q, want %q", title, "Select base branch:")
+		}
+		if len(pinned) != 0 {
+			t.Fatalf("len(pinned) = %d, want 0", len(pinned))
+		}
+		if len(items) != 2 {
+			t.Fatalf("len(items) = %d, want 2", len(items))
+		}
+		return &FuzzyItem{Label: "develop", Value: "develop"}, nil
+	})
+
+	got, err := picker.promptNewBranch(context.Background(), []string{"main", "develop"})
+	if err != nil {
+		t.Fatalf("promptNewBranch() error = %v", err)
+	}
+	if got.Branch != "feat/new-search" || got.BaseBranch != "develop" || !got.IsNew {
+		t.Fatalf("promptNewBranch() = %#v, want new branch result", got)
+	}
+}
+```
+
+Run:
+```bash
+go test ./internal/picker -run "TestPicker_PromptNewBranch_UsesFuzzySelectForBaseBranch" -v
+```
+
+Expected: FAIL because `promptNewBranch` does not accept `context.Context` and no branch-name input seam exists yet.
+
+- [ ] **Step 2: Add the branch-name input seam and refactor `promptNewBranch`**
+
+Update `internal/picker/picker.go` to:
+
+```go
+var runBranchNameInput = func(existingBranches []string) (string, error) {
 	var branchName string
 	err := huh.NewInput().
 		Title("Enter new branch name:").
@@ -1146,171 +978,85 @@ func (p *Picker) promptNewBranch(existingBranches []string) (SelectBranchResult,
 		}).
 		Run()
 	if err != nil {
+		return "", err
+	}
+	return branchName, nil
+}
+
+func (p *Picker) promptNewBranch(ctx context.Context, existingBranches []string) (SelectBranchResult, error) {
+	branchName, err := runBranchNameInput(existingBranches)
+	if err != nil {
 		return SelectBranchResult{}, err
 	}
 
-	// Convert branches to FuzzyItems
 	items := make([]FuzzyItem, len(existingBranches))
 	for i, branch := range existingBranches {
 		items[i] = FuzzyItem{Label: branch, Value: branch}
 	}
 
-	result, err := NewFuzzySelect("Select base branch:", items, nil).Run(ctx)
+	selected, err := runFuzzySelect(ctx, "Select base branch:", items, nil)
 	if err != nil {
 		return SelectBranchResult{}, err
+	}
+	if selected == nil {
+		return SelectBranchResult{}, nil
 	}
 
 	return SelectBranchResult{
 		Branch:     branchName,
-		BaseBranch: result.Value,
+		BaseBranch: selected.Value,
 		IsNew:      true,
 	}, nil
 }
 ```
 
-Note: We need to add `ctx` parameter to `promptNewBranch`. Update the signature and call site.
-
-- [ ] **Step 2: Fix the ctx parameter issue**
-
-Actually, looking at the code, `promptNewBranch` doesn't have access to `ctx`. We need to either:
-1. Pass ctx as a parameter
-2. Store ctx in the Picker struct
-
-Let's pass it as a parameter for minimal changes:
-
-Update the method signature:
-```go
-func (p *Picker) promptNewBranch(ctx context.Context, existingBranches []string) (SelectBranchResult, error) {
-```
-
-And update the call site in `SelectBranch`:
-```go
-return p.promptNewBranch(ctx, branches)
-```
-
-Update the full method:
-
-```go
-func (p *Picker) promptNewBranch(ctx context.Context, existingBranches []string) (SelectBranchResult, error) {
-	var branchName string
-	err := huh.NewInput().
-		Title("Enter new branch name:").
-		Value(&branchName).
-		Validate(func(s string) error {
-			if s == "" {
-				return fmt.Errorf("branch name cannot be empty")
-			}
-			for _, branch := range existingBranches {
-				if branch == s {
-					return fmt.Errorf("branch %q already exists", s)
-				}
-			}
-			return nil
-		}).
-		Run()
-	if err != nil {
-		return SelectBranchResult{}, err
-	}
-
-	// Convert branches to FuzzyItems
-	items := make([]FuzzyItem, len(existingBranches))
-	for i, branch := range existingBranches {
-		items[i] = FuzzyItem{Label: branch, Value: branch}
-	}
-
-	result, err := NewFuzzySelect("Select base branch:", items, nil).Run(ctx)
-	if err != nil {
-		return SelectBranchResult{}, err
-	}
-
-	return SelectBranchResult{
-		Branch:     branchName,
-		BaseBranch: result.Value,
-		IsNew:      true,
-	}, nil
-}
-```
+Make sure the existing `SelectBranch` call site now passes `ctx` into `promptNewBranch`.
 
 Run:
 ```bash
-go build ./...
+go test ./internal/picker -run "TestPicker_" -v
 ```
 
-Expected: Build succeeds
+Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit the base-branch integration**
 
 ```bash
-git add internal/picker/picker.go
-git commit -m "feat(picker): replace huh.Select with FuzzySelect in promptNewBranch base picker"
+git add internal/picker/picker.go internal/picker/picker_test.go
+git commit -m "feat(picker): use fuzzy select for base branch choice"
 ```
 
----
-
-### Task 9: Remove Unused huh Import
+### Task 6: Final verification, manual checks, and branch completion
 
 **Files:**
-- Modify: `internal/picker/picker.go`
+- Verify all modified files
 
-- [ ] **Step 1: Update imports**
-
-We still use `huh.NewInput` for the branch name input, so we keep the `huh` import. Verify imports are correct.
-
-Check current imports in `picker.go`:
-```go
-import (
-	"context"
-	"fmt"
-	"os"
-
-	"github.com/charmbracelet/huh"
-	"github.com/joebalancio/wt/internal/git"
-	"golang.org/x/term"
-)
-```
-
-The `huh` import is still needed for `huh.NewInput`. No changes needed.
-
-Run:
-```bash
-go build ./...
-```
-
-Expected: Build succeeds
-
----
-
-### Task 10: Final Verification and Cleanup
-
-**Files:**
-- All modified files
-
-- [ ] **Step 1: Run all picker tests**
+- [ ] **Step 1: Run focused picker tests**
 
 Run:
 ```bash
 go test ./internal/picker -v
 ```
 
-Expected: All tests PASS
+Expected: all picker tests pass.
 
-- [ ] **Step 2: Run full test suite**
+- [ ] **Step 2: Run the full project test suite**
 
 Run:
 ```bash
 make test
 ```
 
-Expected: All tests PASS
+Expected: test suite passes.
 
-- [ ] **Step 3: Run linter**
+- [ ] **Step 3: Run lint**
 
 Run:
 ```bash
 make lint
 ```
 
-Expected: No errors
+Expected: no lint failures.
 
 - [ ] **Step 4: Build the binary**
 
@@ -1319,67 +1065,59 @@ Run:
 make build
 ```
 
-Expected: Binary created at `bin/wt`
+Expected: `bin/wt` is produced successfully.
 
-- [ ] **Step 5: Manual smoke test**
+- [ ] **Step 5: Do manual smoke checks**
 
 Run:
 ```bash
 ./bin/wt --help
 ```
 
-Expected: Help output displayed
+Expected: CLI help renders successfully.
 
-- [ ] **Step 6: Commit any remaining changes**
+Then manually exercise:
+
+1. `wt add` in a repo with many branches.
+2. Confirm the filter line stays visible while the result list scrolls.
+3. Type `auth` and verify fuzzy hits include both `feat/auth-api` and `feat/oauth-provider`, with the more direct match first.
+4. Press `Esc` or `Ctrl+C` and verify the command exits via `ErrCancelled` handling instead of a generic failure.
+
+- [ ] **Step 6: Commit any remaining cleanup**
 
 ```bash
-git status
-git add -A
-git commit -m "chore: final cleanup for fuzzy picker implementation"
+git status --short
+git add go.mod go.sum internal/picker/fuzzy_select.go internal/picker/fuzzy_select_test.go internal/picker/picker.go internal/picker/picker_test.go
+git commit -m "chore: finalize fuzzy picker implementation"
 ```
 
-- [ ] **Step 7: Create summary commit**
+- [ ] **Step 7: Finish the development branch workflow**
 
-```bash
-git log --oneline -10
-```
+Follow `superpowers:finishing-a-development-branch`, including:
 
-Verify the commits are logical and atomic.
-
----
+1. verifying the branch is clean,
+2. reviewing commit history,
+3. completing any required issue-tracker updates,
+4. `git pull --rebase`,
+5. `bd sync`,
+6. `git push`,
+7. confirming `git status` reports the branch is up to date with origin.
 
 ## Testing Checklist
 
-After implementation, verify:
+- [ ] `go test ./internal/picker -v`
+- [ ] `make test`
+- [ ] `make lint`
+- [ ] `make build`
+- [ ] Empty query shows all items in source order
+- [ ] Pinned items stay visible above filtered results
+- [ ] Fuzzy query ranks the closer auth branch first
+- [ ] Esc / Ctrl+C returns `ErrCancelled`
+- [ ] Large result sets keep the input visible while the viewport scrolls
+- [ ] Base-branch selection in new-branch flow uses the custom picker
 
-- [ ] **Unit tests pass** — `go test ./internal/picker -v`
-- [ ] **Integration tests pass** — `make test`
-- [ ] **Linter passes** — `make lint`
-- [ ] **Binary builds** — `make build`
-- [ ] **Small list (<10 items)** — Filter input visible, no unnecessary scrolling
-- [ ] **Large list (100+ items)** — Filter input stays pinned, viewport scrolls
-- [ ] **Fuzzy matching** — `auth` matches `feat/auth-api` higher than `feat/oauth-provider`
-- [ ] **Pinned items** — "Create new branch" always visible
-- [ ] **Cancellation** — Esc/Ctrl+C returns `ErrCancelled`
-- [ ] **Terminal resize** — Viewport adapts to window size
+## Notes for the Implementer
 
----
-
-## Rollback Plan
-
-If issues arise:
-
-1. **Revert commits:**
-   ```bash
-   git revert HEAD~N  # where N is number of commits
-   ```
-
-2. **Or restore from backup branch:**
-   ```bash
-   git checkout backup-branch
-   ```
-
-3. **Specific file rollback:**
-   ```bash
-   git checkout HEAD~1 -- internal/picker/picker.go
-   ```
+- Do not remove `huh` from `go.mod`; it is still needed for `huh.NewInput()`.
+- Keep the test seams (`runFuzzySelect`, `runBranchNameInput`) package-private and narrowly scoped. They exist only to keep tests deterministic.
+- If `Run` returns `nil, nil` after `program.Run()`, treat that as an unexpected empty result and convert it to a concrete error during implementation instead of letting callers silently continue.

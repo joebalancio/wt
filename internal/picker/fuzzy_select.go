@@ -17,18 +17,20 @@ import (
 )
 
 // ErrCancelled reports an explicit user cancellation.
-var ErrCancelled = errors.New("selection cancelled")
+var ErrCancelled = errors.New("selection canceled")
 
 var (
 	selectedStyle = lipgloss.NewStyle().Bold(true).Reverse(true)
 	matchStyle    = lipgloss.NewStyle().Bold(true)
 )
 
+// FuzzyItem is a selectable item in the fuzzy picker.
 type FuzzyItem struct {
 	Label string
 	Value string
 }
 
+// FuzzySelect is a Bubble Tea model for fuzzy selection with pinned items.
 type FuzzySelect struct {
 	title     string
 	items     []FuzzyItem
@@ -39,9 +41,10 @@ type FuzzySelect struct {
 	cursor    int
 	height    int
 	chosen    *FuzzyItem
-	cancelled bool
+	canceled  bool
 }
 
+// NewFuzzySelect constructs a fuzzy picker with the provided title and items.
 func NewFuzzySelect(title string, items []FuzzyItem, pinned []FuzzyItem) *FuzzySelect {
 	input := textinput.New()
 	input.Placeholder = "Type to filter..."
@@ -57,7 +60,7 @@ func NewFuzzySelect(title string, items []FuzzyItem, pinned []FuzzyItem) *FuzzyS
 		items:     append([]FuzzyItem(nil), items...),
 		pinned:    append([]FuzzyItem(nil), pinned...),
 		textInput: input,
-		viewport:  viewport.New(0, min(height, max(1, len(items)+len(pinned)))),
+		viewport:  viewport.New(0, smallerInt(height, largerInt(1, len(items)+len(pinned)))),
 		height:    height,
 	}
 	model.refreshMatches()
@@ -66,10 +69,12 @@ func NewFuzzySelect(title string, items []FuzzyItem, pinned []FuzzyItem) *FuzzyS
 	return model
 }
 
+// Init implements tea.Model.
 func (m *FuzzySelect) Init() tea.Cmd {
 	return nil
 }
 
+// Update implements tea.Model.
 func (m *FuzzySelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -78,13 +83,13 @@ func (m *FuzzySelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.height = 1
 		}
 		m.viewport.Width = msg.Width
-		m.viewport.Height = min(m.height, max(1, m.totalOptions()))
+		m.viewport.Height = smallerInt(m.height, largerInt(1, m.totalOptions()))
 		m.syncViewport()
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEscape:
-			m.cancelled = true
+			m.canceled = true
 			return m, tea.Quit
 		case tea.KeyUp, tea.KeyCtrlP, tea.KeyCtrlK:
 			if m.cursor > 0 {
@@ -120,6 +125,7 @@ func (m *FuzzySelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View implements tea.Model.
 func (m *FuzzySelect) View() string {
 	return strings.Join([]string{
 		fmt.Sprintf("%s  %d/%d", m.title, len(m.visibleItems()), len(m.items)),
@@ -178,8 +184,9 @@ func (m *FuzzySelect) totalOptions() int {
 	return len(m.pinned) + len(m.visibleItems())
 }
 
+// Run executes the picker program and returns the selected item.
 func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
-	if m.cancelled {
+	if m.canceled {
 		return nil, ErrCancelled
 	}
 	if m.chosen != nil {
@@ -192,8 +199,11 @@ func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
 		return nil, fmt.Errorf("run fuzzy select: %w", err)
 	}
 
-	result := finalModel.(*FuzzySelect)
-	if result.cancelled {
+	result, ok := finalModel.(*FuzzySelect)
+	if !ok {
+		return nil, fmt.Errorf("run fuzzy select: unexpected model type %T", finalModel)
+	}
+	if result.canceled {
 		return nil, ErrCancelled
 	}
 	if result.chosen == nil {
@@ -225,7 +235,7 @@ func (m *FuzzySelect) syncViewport() {
 	}
 
 	if m.viewport.Height == 0 {
-		m.viewport.Height = min(m.height, max(1, len(lines)))
+		m.viewport.Height = smallerInt(m.height, largerInt(1, len(lines)))
 	}
 
 	m.viewport.SetContent(strings.Join(lines, "\n"))
@@ -275,14 +285,14 @@ func (m *FuzzySelect) keepCursorVisible(totalLines int) {
 	}
 }
 
-func min(a, b int) int {
+func smallerInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b int) int {
+func largerInt(a, b int) int {
 	if a > b {
 		return a
 	}
