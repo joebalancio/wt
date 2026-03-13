@@ -141,8 +141,8 @@ func TestFuzzySelect_Update_EscapeCancels(t *testing.T) {
 
 	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyEscape})
 	updated := next.(*FuzzySelect)
-	if !updated.cancelled {
-		t.Fatal("cancelled = false, want true")
+	if !updated.canceled {
+		t.Fatal("canceled = false, want true")
 	}
 }
 
@@ -217,7 +217,7 @@ func TestFuzzySelect_Run_ShortCircuitsChosenAndCancelled(t *testing.T) {
 	aborted := NewFuzzySelect("Select:", []FuzzyItem{
 		{Label: "main", Value: "main"},
 	}, nil)
-	aborted.cancelled = true
+	aborted.canceled = true
 
 	item, err = aborted.Run(context.Background())
 	if !errors.Is(err, ErrCancelled) {

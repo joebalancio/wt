@@ -41,7 +41,7 @@ type FuzzySelect struct {
 	cursor    int
 	height    int
 	chosen    *FuzzyItem
-	cancelled bool
+	canceled  bool
 }
 
 type visibleItem struct {
@@ -94,7 +94,7 @@ func (m *FuzzySelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEscape:
-			m.cancelled = true
+			m.canceled = true
 			return m, tea.Quit
 		case tea.KeyUp, tea.KeyCtrlP, tea.KeyCtrlK:
 			if m.cursor > 0 {
@@ -208,7 +208,7 @@ func (m *FuzzySelect) totalOptions() int {
 
 // Run executes the picker program and returns the selected item.
 func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
-	if m.cancelled {
+	if m.canceled {
 		return nil, ErrCancelled
 	}
 	if m.chosen != nil {
@@ -225,7 +225,7 @@ func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
 	if !ok {
 		return nil, fmt.Errorf("run fuzzy select: unexpected model type %T", finalModel)
 	}
-	if result.cancelled {
+	if result.canceled {
 		return nil, ErrCancelled
 	}
 	if result.chosen == nil {
