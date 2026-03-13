@@ -183,6 +183,23 @@ func TestFuzzySelect_View_ShowsTitleCountInputAndPinnedItem(t *testing.T) {
 	}
 }
 
+func TestFuzzySelect_VisibleEntries_PreservesMatchedIndexes(t *testing.T) {
+	model := NewFuzzySelect("Select:", []FuzzyItem{
+		{Label: "feat/oauth-provider", Value: "feat/oauth-provider"},
+		{Label: "feat/auth-api", Value: "feat/auth-api"},
+	}, nil)
+	model.textInput.SetValue("auth")
+	model.refreshMatches()
+
+	entries := model.visibleEntries()
+	if len(entries) == 0 {
+		t.Fatal("visibleEntries() returned no matches")
+	}
+	if len(entries[0].matchedIndexes) == 0 {
+		t.Fatal("matchedIndexes should be preserved for highlighted rendering")
+	}
+}
+
 func TestFuzzySelect_Run_ShortCircuitsChosenAndCancelled(t *testing.T) {
 	model := NewFuzzySelect("Select:", []FuzzyItem{
 		{Label: "main", Value: "main"},

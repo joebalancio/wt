@@ -5,6 +5,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/joebalancio/wt/internal/config"
+	"github.com/joebalancio/wt/internal/picker"
 	"github.com/joebalancio/wt/internal/tmux"
 	"github.com/joebalancio/wt/pkg/executor"
 	"github.com/spf13/cobra"
@@ -115,6 +117,10 @@ func Fatal(format string, args ...interface{}) {
 // Warn prints a warning to stderr (does not exit)
 func Warn(format string, args ...interface{}) {
 	_, _ = fmt.Fprintf(os.Stderr, "Warning: "+format+"\n", args...)
+}
+
+func isPickerCancelled(err error) bool {
+	return errors.Is(err, picker.ErrCancelled)
 }
 
 // expandRunTemplate expands template variables in a run command.

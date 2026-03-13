@@ -44,6 +44,11 @@ type FuzzySelect struct {
 	canceled  bool
 }
 
+type visibleItem struct {
+	item           FuzzyItem
+	matchedIndexes []int
+}
+
 // NewFuzzySelect constructs a fuzzy picker with the provided title and items.
 func NewFuzzySelect(title string, items []FuzzyItem, pinned []FuzzyItem) *FuzzySelect {
 	input := textinput.New()
@@ -153,13 +158,30 @@ func (m *FuzzySelect) refreshMatches() {
 }
 
 func (m *FuzzySelect) visibleItems() []FuzzyItem {
-	if m.textInput.Value() == "" {
-		return append([]FuzzyItem(nil), m.items...)
+	entries := m.visibleEntries()
+	items := make([]FuzzyItem, 0, len(entries))
+	for _, entry := range entries {
+		items = append(items, entry.item)
 	}
 
-	items := make([]FuzzyItem, 0, len(m.matches))
+	return items
+}
+
+func (m *FuzzySelect) visibleEntries() []visibleItem {
+	if m.textInput.Value() == "" {
+		items := make([]visibleItem, 0, len(m.items))
+		for _, item := range m.items {
+			items = append(items, visibleItem{item: item})
+		}
+		return items
+	}
+
+	items := make([]visibleItem, 0, len(m.matches))
 	for _, match := range m.matches {
-		items = append(items, m.items[match.Index])
+		items = append(items, visibleItem{
+			item:           m.items[match.Index],
+			matchedIndexes: append([]int(nil), match.MatchedIndexes...),
+		})
 	}
 
 	return items
@@ -170,13 +192,13 @@ func (m *FuzzySelect) selectedItem() *FuzzyItem {
 		return &m.pinned[m.cursor]
 	}
 
-	visible := m.visibleItems()
+	visible := m.visibleEntries()
 	index := m.cursor - len(m.pinned)
 	if index < 0 || index >= len(visible) {
 		return nil
 	}
 
-	item := visible[index]
+	item := visible[index].item
 	return &item
 }
 
@@ -214,7 +236,7 @@ func (m *FuzzySelect) Run(ctx context.Context) (*FuzzyItem, error) {
 }
 
 func (m *FuzzySelect) syncViewport() {
-	visible := m.visibleItems()
+	visible := m.visibleEntries()
 	lines := make([]string, 0, len(m.pinned)+len(visible))
 
 	for i, item := range m.pinned {
@@ -225,11 +247,12 @@ func (m *FuzzySelect) syncViewport() {
 		lines = append(lines, line)
 	}
 
-	for i, item := range visible {
+	for i, entry := range visible {
 		cursorIndex := len(m.pinned) + i
-		line := "  " + m.renderLabel(item)
+		renderedLabel := m.renderLabel(entry.item, entry.matchedIndexes)
+		line := "  " + renderedLabel
 		if m.cursor == cursorIndex {
-			line = selectedStyle.Render("> " + m.renderLabel(item))
+			line = selectedStyle.Render("> " + renderedLabel)
 		}
 		lines = append(lines, line)
 	}
@@ -242,19 +265,13 @@ func (m *FuzzySelect) syncViewport() {
 	m.keepCursorVisible(len(lines))
 }
 
-func (m *FuzzySelect) renderLabel(item FuzzyItem) string {
-	query := m.textInput.Value()
-	if query == "" {
+func (m *FuzzySelect) renderLabel(item FuzzyItem, matchedIndexes []int) string {
+	if len(matchedIndexes) == 0 {
 		return item.Label
 	}
 
-	matches := fuzzy.Find(query, []string{item.Label})
-	if len(matches) == 0 {
-		return item.Label
-	}
-
-	matched := make(map[int]struct{}, len(matches[0].MatchedIndexes))
-	for _, idx := range matches[0].MatchedIndexes {
+	matched := make(map[int]struct{}, len(matchedIndexes))
+	for _, idx := range matchedIndexes {
 		matched[idx] = struct{}{}
 	}
 
