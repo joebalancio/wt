@@ -214,12 +214,12 @@ func TestFuzzySelect_Run_ShortCircuitsChosenAndCancelled(t *testing.T) {
 		t.Fatalf("Run() item = %#v, want main", item)
 	}
 
-	cancelled := NewFuzzySelect("Select:", []FuzzyItem{
+	aborted := NewFuzzySelect("Select:", []FuzzyItem{
 		{Label: "main", Value: "main"},
 	}, nil)
-	cancelled.cancelled = true
+	aborted.cancelled = true
 
-	item, err = cancelled.Run(context.Background())
+	item, err = aborted.Run(context.Background())
 	if !errors.Is(err, ErrCancelled) {
 		t.Fatalf("Run() err = %v, want ErrCancelled", err)
 	}
