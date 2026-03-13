@@ -87,9 +87,6 @@ func (p *Picker) SelectWorktree(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if selected == nil {
-		return "", nil
-	}
 
 	return selected.Value, nil
 }
@@ -119,9 +116,6 @@ func (p *Picker) SelectBranch(ctx context.Context) (SelectBranchResult, error) {
 	if err != nil {
 		return SelectBranchResult{}, err
 	}
-	if selected == nil {
-		return SelectBranchResult{}, nil
-	}
 
 	if selected.Value == newBranchOption {
 		return p.promptNewBranch(ctx, branches)
@@ -147,9 +141,6 @@ func (p *Picker) promptNewBranch(ctx context.Context, existingBranches []string)
 	baseBranch, err := runFuzzySelect(ctx, "Select base branch:", items, nil)
 	if err != nil {
 		return SelectBranchResult{}, err
-	}
-	if baseBranch == nil {
-		return SelectBranchResult{}, nil
 	}
 
 	return SelectBranchResult{
