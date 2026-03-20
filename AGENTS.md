@@ -228,6 +228,9 @@ internal/
 ├── stack/             # Stack management
 │   ├── service.go     # Stack service logic
 │   └── tree.go        # Tree formatting for display
+├── picker/            # Interactive TUI selection
+│   ├── picker.go      # Branch/worktree selection with fuzzy matching
+│   └── fuzzy_select.go # Bubble Tea fuzzy picker implementation
 └── worktree/          # Worktree service layer
     └── service.go     # Worktree operations
 pkg/
@@ -344,8 +347,11 @@ Hook commands support `{worktree_path}` template variable. This is expanded befo
 - `gopkg.in/yaml.v3` - YAML configuration parsing
 - `github.com/aidarkhanov/nanoid` - Unique ID generation for branch suffixes
 - `github.com/abhinav/git-spice` - Branch stacking (external dependency, invoked via CLI)
+- `github.com/charmbracelet/bubbletea` - TUI framework for interactive components
+- `github.com/charmbracelet/lipgloss` - Styling and layout for TUI
+- `github.com/sahilm/fuzzy` - Fuzzy string matching algorithm
 
-No other external dependencies. Git and tmux are invoked via CLI, not libraries.
+Git and tmux are invoked via CLI, not libraries.
 
 ### Stack Management (v2)
 

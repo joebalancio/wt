@@ -13,6 +13,34 @@ import (
 
 const newBranchOption = "Create new branch"
 
+var runFuzzySelect = func(ctx context.Context, title string, items []FuzzyItem, pinned []FuzzyItem) (*FuzzyItem, error) {
+	return NewFuzzySelect(title, items, pinned).Run(ctx)
+}
+
+var runBranchNameInput = func(existingBranches []string) (string, error) {
+	var branchName string
+	err := huh.NewInput().
+		Title("Enter new branch name:").
+		Value(&branchName).
+		Validate(func(s string) error {
+			if s == "" {
+				return fmt.Errorf("branch name cannot be empty")
+			}
+			for _, branch := range existingBranches {
+				if branch == s {
+					return fmt.Errorf("branch %q already exists", s)
+				}
+			}
+			return nil
+		}).
+		Run()
+	if err != nil {
+		return "", err
+	}
+
+	return branchName, nil
+}
+
 // Picker provides interactive selection functionality.
 type Picker struct {
 	gitClient git.BranchLister
@@ -40,27 +68,27 @@ func (p *Picker) SelectWorktree(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("no worktrees found")
 	}
 
-	var options []huh.Option[string]
+	items := make([]FuzzyItem, 0, len(worktrees))
 	for _, wt := range worktrees {
 		if wt.Branch == "" {
 			continue
 		}
-		label := fmt.Sprintf("%s -> %s", wt.Branch, wt.Path)
-		options = append(options, huh.NewOption(label, wt.Path))
+		items = append(items, FuzzyItem{
+			Label: fmt.Sprintf("%s -> %s", wt.Branch, wt.Path),
+			Value: wt.Path,
+		})
 	}
 
-	if len(options) == 0 {
+	if len(items) == 0 {
 		return "", fmt.Errorf("no removable worktrees found")
 	}
 
-	var selected string
-	err = huh.NewSelect[string]().
-		Title("Select worktree to remove:").
-		Options(options...).
-		Value(&selected).
-		Run()
+	selected, err := runFuzzySelect(ctx, "Select worktree to remove:", items, nil)
+	if err != nil {
+		return "", err
+	}
 
-	return selected, err
+	return selected.Value, nil
 }
 
 // SelectBranchResult contains the result of branch selection.
@@ -77,70 +105,47 @@ func (p *Picker) SelectBranch(ctx context.Context) (SelectBranchResult, error) {
 		return SelectBranchResult{}, fmt.Errorf("list branches: %w", err)
 	}
 
-	options := []huh.Option[string]{huh.NewOption(newBranchOption, newBranchOption)}
+	items := make([]FuzzyItem, 0, len(branches))
 	for _, branch := range branches {
-		options = append(options, huh.NewOption(branch, branch))
+		items = append(items, FuzzyItem{Label: branch, Value: branch})
 	}
 
-	var selected string
-	err = huh.NewSelect[string]().
-		Title("Select or create a branch:").
-		Options(options...).
-		Value(&selected).
-		Run()
+	selected, err := runFuzzySelect(ctx, "Select or create a branch:", items, []FuzzyItem{
+		{Label: newBranchOption, Value: newBranchOption},
+	})
 	if err != nil {
 		return SelectBranchResult{}, err
 	}
 
-	if selected == newBranchOption {
-		return p.promptNewBranch(branches)
+	if selected.Value == newBranchOption {
+		return p.promptNewBranch(ctx, branches)
 	}
 
 	return SelectBranchResult{
-		Branch: selected,
+		Branch: selected.Value,
 		IsNew:  false,
 	}, nil
 }
 
-func (p *Picker) promptNewBranch(existingBranches []string) (SelectBranchResult, error) {
-	var branchName string
-	err := huh.NewInput().
-		Title("Enter new branch name:").
-		Value(&branchName).
-		Validate(func(s string) error {
-			if s == "" {
-				return fmt.Errorf("branch name cannot be empty")
-			}
-			for _, branch := range existingBranches {
-				if branch == s {
-					return fmt.Errorf("branch %q already exists", s)
-				}
-			}
-			return nil
-		}).
-		Run()
+func (p *Picker) promptNewBranch(ctx context.Context, existingBranches []string) (SelectBranchResult, error) {
+	branchName, err := runBranchNameInput(existingBranches)
 	if err != nil {
 		return SelectBranchResult{}, err
 	}
 
-	baseOptions := make([]huh.Option[string], len(existingBranches))
+	items := make([]FuzzyItem, len(existingBranches))
 	for i, branch := range existingBranches {
-		baseOptions[i] = huh.NewOption(branch, branch)
+		items[i] = FuzzyItem{Label: branch, Value: branch}
 	}
 
-	var baseBranch string
-	err = huh.NewSelect[string]().
-		Title("Select base branch:").
-		Options(baseOptions...).
-		Value(&baseBranch).
-		Run()
+	baseBranch, err := runFuzzySelect(ctx, "Select base branch:", items, nil)
 	if err != nil {
 		return SelectBranchResult{}, err
 	}
 
 	return SelectBranchResult{
 		Branch:     branchName,
-		BaseBranch: baseBranch,
+		BaseBranch: baseBranch.Value,
 		IsNew:      true,
 	}, nil
 }

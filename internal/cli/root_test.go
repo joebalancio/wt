@@ -1,23 +1,18 @@
 package cli
 
 import (
+	"errors"
 	"testing"
+
+	"github.com/joebalancio/wt/internal/picker"
 )
 
-func TestRootCommand(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		want int
-	}{
-		{"help", []string{"--help"}, 0},
-		{"no args", []string{}, 0},
+func TestIsPickerCanceled(t *testing.T) {
+	if !isPickerCanceled(picker.ErrCanceled) {
+		t.Fatal("ErrCanceled should be recognized as a picker cancellation")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
-			// Set args for this test
-			// In real tests, you'd use ExecuteC or similar
-			_ = tt.args
-		})
+
+	if isPickerCanceled(errors.New("boom")) {
+		t.Fatal("non-picker error should not be recognized as a picker cancellation")
 	}
 }
