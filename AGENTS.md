@@ -340,6 +340,7 @@ Hook commands support `{worktree_path}` template variable. This is expanded befo
 - **Adding new hook types**: Extend `HooksConfig` in `internal/config/config.go`
 - **Testing**: Tests use standard `testing` package; no external test framework
 - **Linting**: `.golangci.yml` configures enabled linters (errcheck, staticcheck, revive, etc.)
+- **Spelling**: Use American English in all code, identifiers, comments, and strings. The `misspell` linter enforces this — e.g. `canceled` not `cancelled`, `color` not `colour`.
 
 ### External Dependencies
 
