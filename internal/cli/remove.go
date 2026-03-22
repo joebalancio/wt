@@ -78,6 +78,9 @@ func runRemoveCommand(cmd *cobra.Command, path string, force domain.ForceLevel) 
 
 	resolvedPath, err := resolveRemovePath(ctx, path, gitClient, svc)
 	if err != nil {
+		if isPickerCanceled(err) {
+			return
+		}
 		Fatal("Error: %v. Provide a path: wt remove <path>", err)
 	}
 
